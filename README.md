@@ -2,7 +2,7 @@
 
 DragonOS 应用开发工具包
 
-DragonOS Application Development Kits
+DragonOS Application Development Kit
 
 ## 简介
 
