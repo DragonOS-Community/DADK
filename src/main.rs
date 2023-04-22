@@ -21,6 +21,10 @@
 //!
 //! DADK is licensed under the [GPLv2 License](LICENSE).
 
+#![feature(io_error_more)]
+
+#[macro_use]
+extern crate lazy_static;
 extern crate log;
 extern crate serde;
 extern crate serde_json;
@@ -28,35 +32,38 @@ extern crate simple_logger;
 
 use std::{fs, path::PathBuf, process::exit};
 
-use clap::{Parser, Subcommand};
-use log::{error, info};
+use clap::Parser;
+use log::{info, error};
 use parser::task::{
-    ArchiveSource, BuildConfig, CodeSource, DADKTask, Dependency, GitSource, InstallConfig,
-    TaskType,
+    BuildConfig, CodeSource, DADKTask, Dependency, GitSource, InstallConfig, TaskType,
 };
 use simple_logger::SimpleLogger;
 
+use crate::{console::Action, scheduler::Scheduler, executor::cache::cache_root_init};
+
+mod console;
+mod executor;
 mod parser;
+mod scheduler;
+mod utils;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
 struct CommandLineArgs {
+    /// DragonOS sysroot在主机上的路径
     #[arg(short, long, value_parser = parse_check_dir_exists)]
     pub dragonos_dir: PathBuf,
+    /// DADK任务配置文件所在目录
     #[arg(short, long, value_parser = parse_check_dir_exists)]
     config_dir: PathBuf,
 
+    /// 要执行的操作
     #[command(subcommand)]
     action: Action,
-}
 
-/// @brief 要执行的操作
-#[derive(Debug, Subcommand)]
-enum Action {
-    Build,
-    Clean,
-    Install,
-    Uninstall,
+    /// DADK缓存根目录
+    #[arg(long, value_parser = parse_check_dir_exists)]
+    cache_dir: Option<PathBuf>,
 }
 
 /// @brief 检查目录是否存在
@@ -79,24 +86,41 @@ fn main() {
     let args = CommandLineArgs::parse();
 
     info!("DADK run with args: {:?}", &args);
+    // DragonOS sysroot在主机上的路径
     let dragonos_dir = args.dragonos_dir;
     let config_dir = args.config_dir;
     let action = args.action;
-    info!("DragonOS dir: {}", dragonos_dir.display());
+    info!("DragonOS sysroot dir: {}", dragonos_dir.display());
     info!("Config dir: {}", config_dir.display());
     info!("Action: {:?}", action);
+
+    // 初始化缓存目录
+    let r = cache_root_init(args.cache_dir);
+    if r.is_err() {
+        error!("Failed to init cache root: {:?}", r.unwrap_err());
+        exit(1);
+    }
 
     let mut parser = parser::Parser::new(config_dir);
     let r = parser.parse();
     if r.is_err() {
-        error!("{:?}", r.unwrap_err());
         exit(1);
     }
-    let tasks: Vec<DADKTask> = r.unwrap();
-    info!("Tasks: {:?}", tasks);
+    let tasks: Vec<(PathBuf, DADKTask)> = r.unwrap();
+    // info!("Parsed tasks: {:?}", tasks);
 
+    let scheduler = Scheduler::new(dragonos_dir, action, tasks);
+    if scheduler.is_err() {
+        exit(1);
+    }
+
+    let r = scheduler.unwrap().run();
+    if r.is_err() {
+        exit(1);
+    }
 }
 
+#[allow(dead_code)]
 fn generate_tmp_dadk() {
     let x = DADKTask {
         name: "test".to_string(),
@@ -121,6 +145,7 @@ fn generate_tmp_dadk() {
             "master".to_string(),
             None,
         ))),
+        envs: None,
     };
     let x = serde_json::to_string(&x).unwrap();
     fs::write("test.json", x).unwrap();
