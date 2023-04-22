@@ -22,14 +22,12 @@
 //!     "install": {安装配置（该部分详见InstallConfig的文档）}
 //! }
 use std::{
+    fmt::Debug,
     fs::{DirEntry, ReadDir},
-    path::PathBuf, fmt::Debug,
+    path::PathBuf,
 };
 
-use log::info;
-use serde::{Deserialize, Serialize};
-
-use crate::parser::task::TaskType;
+use log::{error, info};
 
 use self::task::DADKTask;
 pub mod task;
@@ -45,31 +43,45 @@ pub struct Parser {
     config_files: Vec<PathBuf>,
 }
 
-
 pub struct ParserError {
     pub config_file: Option<PathBuf>,
     pub error: InnerParserError,
 }
-impl Debug for ParserError{
+impl Debug for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.error {
             InnerParserError::IoError(e) => {
                 if let Some(config_file) = &self.config_file {
-                    write!(f, "IO Error while parsing config file {}: {}", config_file.display(), e)
+                    write!(
+                        f,
+                        "IO Error while parsing config file {}: {}",
+                        config_file.display(),
+                        e
+                    )
                 } else {
                     write!(f, "IO Error while parsing config files: {}", e)
                 }
             }
             InnerParserError::JsonError(e) => {
                 if let Some(config_file) = &self.config_file {
-                    write!(f, "Json Error while parsing config file {}: {}", config_file.display(), e)
+                    write!(
+                        f,
+                        "Json Error while parsing config file {}: {}",
+                        config_file.display(),
+                        e
+                    )
                 } else {
                     write!(f, "Json Error while parsing config file: {}", e)
                 }
             }
             InnerParserError::TaskError(e) => {
                 if let Some(config_file) = &self.config_file {
-                    write!(f, "Error while parsing config file {}: {}", config_file.display(), e)
+                    write!(
+                        f,
+                        "Error while parsing config file {}: {}",
+                        config_file.display(),
+                        e
+                    )
                 } else {
                     write!(f, "Error while parsing config file: {}", e)
                 }
@@ -101,14 +113,16 @@ impl Parser {
     ///
     /// ## 返回值
     ///
-    /// * `Ok(Vec<DADKTask>)` - 任务列表
+    /// * `Ok(Vec<(PathBuf, DADKTask)>)` - 任务列表(配置文件路径, 任务)
     /// * `Err(ParserError)` - 解析错误
-    pub fn parse(&mut self) -> Result<Vec<DADKTask>, ParserError> {
-        info!("Parsing config files in {}", self.config_dir.display());
-
+    pub fn parse(&mut self) -> Result<Vec<(PathBuf, DADKTask)>, ParserError> {
         self.scan_config_files()?;
-        println!("Found {} config files", self.config_files.len());
-        return self.gen_tasks();
+        info!("Found {} config files", self.config_files.len());
+        let r: Result<Vec<(PathBuf, DADKTask)>, ParserError> = self.gen_tasks();
+        if r.is_err() {
+            error!("Error while parsing config files: {:?}", r);
+        }
+        return r;
     }
 
     /// # 扫描配置文件目录，找到所有配置文件
@@ -162,11 +176,11 @@ impl Parser {
     ///
     /// * `Ok(Vec<DADKTask>)` - 任务列表
     /// * `Err(ParserError)` - 解析错误
-    fn gen_tasks(&self) -> Result<Vec<DADKTask>, ParserError> {
+    fn gen_tasks(&self) -> Result<Vec<(PathBuf, DADKTask)>, ParserError> {
         let mut result_vec = Vec::new();
         for config_file in &self.config_files {
             let task: DADKTask = self.parse_config_file(config_file)?;
-            result_vec.push(task);
+            result_vec.push((config_file.clone(), task));
         }
 
         return Ok(result_vec);
@@ -189,10 +203,13 @@ impl Parser {
         })?;
 
         // 从json字符串中解析出DADKTask
-        let task: DADKTask = serde_json::from_str(&content).map_err(|e| ParserError {
+        let mut task: DADKTask = serde_json::from_str(&content).map_err(|e| ParserError {
             config_file: Some(config_file.clone()),
             error: InnerParserError::JsonError(e),
         })?;
+
+        // 去除字符串中的空白字符
+        task.trim();
 
         // 校验DADKTask的参数是否合法
         task.validate().map_err(|e| ParserError {
@@ -202,5 +219,4 @@ impl Parser {
 
         return Ok(task);
     }
-
 }
