@@ -33,9 +33,10 @@ extern crate simple_logger;
 use std::{fs, path::PathBuf, process::exit};
 
 use clap::Parser;
+use executor::source::GitSource;
 use log::{info, error};
 use parser::task::{
-    BuildConfig, CodeSource, DADKTask, Dependency, GitSource, InstallConfig, TaskType,
+    BuildConfig, CodeSource, DADKTask, Dependency,  InstallConfig, TaskType,
 };
 use simple_logger::SimpleLogger;
 
@@ -126,11 +127,10 @@ fn generate_tmp_dadk() {
         name: "test".to_string(),
         version: "0.1.0".to_string(),
         build: BuildConfig {
-            build_command: "echo test".to_string(),
+            build_command: Some("echo test".to_string()),
         },
         install: InstallConfig {
             in_dragonos_path: PathBuf::from("/bin"),
-            install_command: "echo test".to_string(),
         },
         depends: vec![Dependency {
             name: "test".to_string(),
@@ -142,7 +142,7 @@ fn generate_tmp_dadk() {
         // ))),
         task_type: TaskType::BuildFromSource(CodeSource::Git(GitSource::new(
             "123".to_string(),
-            "master".to_string(),
+            Some("master".to_string()),
             None,
         ))),
         envs: None,

@@ -75,8 +75,9 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
     return Ok(());
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CacheDir {
+    #[allow(dead_code)]
     entity: Rc<SchedEntity>,
     pub path: PathBuf,
     pub cache_type: CacheDirType,
@@ -127,12 +128,12 @@ impl CacheDir {
         return Ok(Self::new(entity, CacheDirType::Source)?.path);
     }
 
-    pub fn build_dir_env_key(entity: Rc<SchedEntity>) -> Result<String, ExecutorError> {
+    pub fn build_dir_env_key(entity: &Rc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
         return Ok(format!("DADK_BUILD_CACHE_DIR_{}", name_version_env));
     }
 
-    pub fn source_dir_env_key(entity: Rc<SchedEntity>) -> Result<String, ExecutorError> {
+    pub fn source_dir_env_key(entity: &Rc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
         return Ok(format!("DADK_SOURCE_CACHE_DIR_{}", name_version_env));
     }
@@ -159,7 +160,7 @@ impl CacheDir {
         unimplemented!("Not fully implemented task type: {:?}", task_type);
     }
 
-    fn create(&self) -> Result<(), ExecutorError> {
+    pub fn create(&self) -> Result<(), ExecutorError> {
         if !self.path.exists() {
             info!("Cache dir not exists, create it: {:?}", self.path);
             std::fs::create_dir_all(&self.path).map_err(|e| ExecutorError::IoError(e))?;
@@ -173,5 +174,15 @@ impl CacheDir {
         }
         
         return Ok(());
+    }
+
+    /// 判断缓存目录是否为空
+    pub fn is_empty(&self) -> Result<bool, ExecutorError> {
+        let x = self.path.read_dir().map_err(|e| ExecutorError::IoError(e))?;
+        for _ in x {
+            return Ok(false);
+        }
+
+        return Ok(true);
     }
 }

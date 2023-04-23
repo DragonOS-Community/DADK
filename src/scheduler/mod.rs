@@ -2,8 +2,9 @@ use std::{
     collections::BTreeMap,
     fmt::Debug,
     path::PathBuf,
+    process::exit,
     rc::Rc,
-    sync::atomic::{AtomicI32, Ordering}, process::exit,
+    sync::atomic::{AtomicI32, Ordering},
 };
 
 use log::{error, info};
@@ -11,13 +12,19 @@ use log::{error, info};
 use crate::{console::Action, executor::Executor, parser::task::DADKTask};
 
 /// # 调度实体
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SchedEntity {
     /// 任务ID
     id: i32,
     file_path: PathBuf,
     /// 任务
     task: DADKTask,
+}
+
+impl PartialEq for SchedEntity {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 impl SchedEntity {
@@ -52,7 +59,7 @@ pub struct SchedEntities {
     /// 任务ID到调度实体的映射
     id2entity: BTreeMap<i32, Rc<SchedEntity>>,
     /// 任务名和版本到调度实体的映射
-    name_version_2_entity: BTreeMap<(String, String), Rc<SchedEntity>>,
+    name_version_2_entity: BTreeMap<String, Rc<SchedEntity>>,
 }
 
 impl SchedEntities {
@@ -67,10 +74,8 @@ impl SchedEntities {
     pub fn add(&mut self, entity: Rc<SchedEntity>) {
         self.entities.push(entity.clone());
         self.id2entity.insert(entity.id, entity.clone());
-        self.name_version_2_entity.insert(
-            (entity.task.name.clone(), entity.task.version.clone()),
-            entity,
-        );
+        self.name_version_2_entity
+            .insert(entity.task.name_version_env(), entity);
     }
 
     #[allow(dead_code)]
@@ -80,7 +85,7 @@ impl SchedEntities {
 
     pub fn get_by_name_version(&self, name: &str, version: &str) -> Option<Rc<SchedEntity>> {
         self.name_version_2_entity
-            .get(&(name.to_string(), version.to_string()))
+            .get(&DADKTask::name_version_uppercase(name, version))
             .cloned()
     }
 
@@ -133,30 +138,24 @@ impl SchedEntities {
             if let Some(dep_entity) = self.get_by_name_version(&dep.name, &dep.version) {
                 if let Some(&false) = visited.get(&dep_entity.id) {
                     // 输出完整环形依赖
-                    let mut err = DependencyCycleError::new();
+                    let mut err = DependencyCycleError::new(dep_entity.clone());
 
-                    err.add(
-                        entity.file_path.clone(),
-                        format!(
-                            "{} ({})",
-                            dep_entity.task.name_version(),
-                            dep_entity.file_path.display()
-                        ),
-                    );
+                    err.add(entity.clone(), dep_entity);
                     return Err(err);
                 }
                 if !visited.contains_key(&dep_entity.id) {
                     let r = self.dfs(&dep_entity, visited, result);
                     if r.is_err() {
-                        let mut err = r.unwrap_err();
-                        err.add(
-                            entity.file_path.clone(),
-                            format!(
-                                "{} ({})",
-                                dep_entity.task.name_version(),
-                                dep_entity.file_path.display()
-                            ),
-                        );
+                        let mut err: DependencyCycleError = r.unwrap_err();
+                        // 如果错误已经停止传播，则直接返回
+                        if err.stop_propagation {
+                            return Err(err);
+                        }
+                        // 如果当前实体是错误的起始实体，则停止传播
+                        if entity == &err.head_entity {
+                            err.stop_propagation();
+                        }
+                        err.add(entity.clone(), dep_entity);
                         return Err(err);
                     }
                 }
@@ -300,23 +299,32 @@ impl Scheduler {
             .map_err(|e| SchedulerError::RunError(format!("{:?}", e)))?;
 
         for entity in r.iter() {
-            let executor = Executor::new(entity.clone()).map_err(|e| {
+            let mut executor = Executor::new(
+                entity.clone(),
+                self.action.clone(),
+                self.dragonos_dir.clone(),
+            )
+            .map_err(|e| {
                 error!(
                     "Error while creating executor for task {} : {:?}",
                     entity.task().name_version(),
                     e
                 );
                 exit(-1);
-            }).unwrap();
+            })
+            .unwrap();
 
-            executor.execute().map_err(|e| {
-                error!(
-                    "Error while executing task {} : {:?}",
-                    entity.task().name_version(),
-                    e
-                );
-                exit(-1);
-            }).unwrap();
+            executor
+                .execute()
+                .map_err(|e| {
+                    error!(
+                        "Error while executing task {} : {:?}",
+                        entity.task().name_version(),
+                        e
+                    );
+                    exit(-1);
+                })
+                .unwrap();
         }
         return Ok(());
     }
@@ -363,32 +371,49 @@ impl Scheduler {
 /// B -> C
 /// A -> B
 pub struct DependencyCycleError {
-    dependencies: Vec<(PathBuf, String)>,
+    /// # 起始实体
+    /// 本错误的起始实体，即环形依赖的起点
+    head_entity: Rc<SchedEntity>,
+    /// 是否停止传播
+    stop_propagation: bool,
+    /// 依赖关系
+    dependencies: Vec<(Rc<SchedEntity>, Rc<SchedEntity>)>,
 }
 
 impl DependencyCycleError {
-    pub fn new() -> Self {
+    pub fn new(head_entity: Rc<SchedEntity>) -> Self {
         Self {
+            head_entity,
+            stop_propagation: false,
             dependencies: Vec::new(),
         }
     }
 
-    pub fn add(&mut self, path: PathBuf, dependency: String) {
-        self.dependencies.push((path, dependency));
+    pub fn add(&mut self, current: Rc<SchedEntity>, dependency: Rc<SchedEntity>) {
+        self.dependencies.push((current, dependency));
+    }
+
+    pub fn stop_propagation(&mut self) {
+        self.stop_propagation = true;
     }
 
     #[allow(dead_code)]
-    pub fn dependencies(&self) -> &Vec<(PathBuf, String)> {
+    pub fn dependencies(&self) -> &Vec<(Rc<SchedEntity>, Rc<SchedEntity>)> {
         &self.dependencies
     }
 
     pub fn display(&self) -> String {
+        let mut tmp = self.dependencies.clone();
+        tmp.reverse();
+
         let mut ret = format!("Dependency cycle detected: \nStart ->\n");
-        for entity in self.dependencies.iter() {
+        for (current, dep) in tmp.iter() {
             ret.push_str(&format!(
-                "->\t{}\t--depends-->\t{}\n",
-                entity.0.display(),
-                entity.1
+                "->\t{} ({})\t--depends-->\t{} ({})\n",
+                current.task.name_version(),
+                current.file_path.display(),
+                dep.task.name_version(),
+                dep.file_path.display()
             ));
         }
         ret.push_str("-> End");
