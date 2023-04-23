@@ -1,6 +1,9 @@
-use std::{process::{Stdio, Command}, path::PathBuf};
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
-use log::{info, debug};
+use log::{debug, info};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
@@ -302,7 +305,6 @@ impl GitSource {
         return Ok(());
     }
 }
-
 
 /// # 本地源
 #[derive(Debug, Clone, Serialize, Deserialize)]

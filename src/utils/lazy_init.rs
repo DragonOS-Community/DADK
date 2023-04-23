@@ -20,10 +20,8 @@ use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-
+use std::sync::Mutex;
 
 /// A wrapper around a value that is initialized lazily.
 pub struct Lazy<T> {

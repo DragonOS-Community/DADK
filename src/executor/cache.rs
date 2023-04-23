@@ -172,13 +172,16 @@ impl CacheDir {
                 format!("Cache dir is not a directory: {:?}", self.path),
             )));
         }
-        
+
         return Ok(());
     }
 
     /// 判断缓存目录是否为空
     pub fn is_empty(&self) -> Result<bool, ExecutorError> {
-        let x = self.path.read_dir().map_err(|e| ExecutorError::IoError(e))?;
+        let x = self
+            .path
+            .read_dir()
+            .map_err(|e| ExecutorError::IoError(e))?;
         for _ in x {
             return Ok(false);
         }

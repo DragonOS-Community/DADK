@@ -34,13 +34,11 @@ use std::{fs, path::PathBuf, process::exit};
 
 use clap::Parser;
 use executor::source::GitSource;
-use log::{info, error};
-use parser::task::{
-    BuildConfig, CodeSource, DADKTask, Dependency,  InstallConfig, TaskType,
-};
+use log::{error, info};
+use parser::task::{BuildConfig, CodeSource, DADKTask, Dependency, InstallConfig, TaskType};
 use simple_logger::SimpleLogger;
 
-use crate::{console::Action, scheduler::Scheduler, executor::cache::cache_root_init};
+use crate::{console::Action, executor::cache::cache_root_init, scheduler::Scheduler};
 
 mod console;
 mod executor;
