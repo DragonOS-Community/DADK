@@ -19,7 +19,8 @@
 //!     "task_type": {任务类型（该部分详见`TaskType`的文档）},
 //!     "depends": [{依赖项（该部分详见Dependency的文档）}],
 //!     "build": {构建配置（该部分详见BuildConfig的文档）},
-//!     "install": {安装配置（该部分详见InstallConfig的文档）}
+//!     "install": {安装配置（该部分详见InstallConfig的文档）},
+//!     "envs" : [{ "key": "环境变量名", "value": "环境变量值" }]
 //! }
 use std::{
     fmt::Debug,

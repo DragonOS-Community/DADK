@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
-use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
+use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
+
 // 对于生成的包名和版本号，需要进行替换的字符。
-pub static NAME_VERSION_REPLACE_TABLE: [(&str, &str); 3] = [(" ", "_"), ("\t", "_"), ("-", "_")];
+pub static NAME_VERSION_REPLACE_TABLE: [(&str, &str); 4] =
+    [(" ", "_"), ("\t", "_"), ("-", "_"), (".", "_")];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DADKTask {
@@ -50,7 +52,7 @@ impl DADKTask {
         }
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<(), String> {
         if self.name.is_empty() {
             return Err("name is empty".to_string());
         }
@@ -59,6 +61,7 @@ impl DADKTask {
         }
         self.task_type.validate()?;
         self.build.validate()?;
+        self.validate_build_type()?;
         self.install.validate()?;
         self.validate_depends()?;
         self.validate_envs()?;
@@ -107,30 +110,76 @@ impl DADKTask {
         }
     }
 
+    /// 验证任务类型与构建配置是否匹配
+    fn validate_build_type(&self) -> Result<(), String> {
+        match &self.task_type {
+            TaskType::BuildFromSource(_) => {
+                if self.build.build_command.is_none() {
+                    return Err("build command is empty".to_string());
+                }
+            }
+            TaskType::InstallFromPrebuilt(_) => {
+                if self.build.build_command.is_some() {
+                    return Err(
+                        "build command should be empty when install from prebuilt".to_string()
+                    );
+                }
+            }
+        }
+        return Ok(());
+    }
+
     pub fn name_version(&self) -> String {
         return format!("{}-{}", self.name, self.version);
     }
 
     pub fn name_version_env(&self) -> String {
-        let mut name_version = self.name_version();
+        return Self::name_version_uppercase(&self.name, &self.version);
+    }
+
+    pub fn name_version_uppercase(name: &str, version: &str) -> String {
+        let mut name_version = format!("{}-{}", name, version).to_ascii_uppercase();
         for (src, dst) in &NAME_VERSION_REPLACE_TABLE {
             name_version = name_version.replace(src, dst);
         }
         return name_version;
     }
 
+    /// # 获取源码目录
+    ///
+    /// 如果从本地路径构建，则返回本地路径。否则返回None。
+    pub fn source_path(&self) -> Option<PathBuf> {
+        match &self.task_type {
+            TaskType::BuildFromSource(cs) => match cs {
+                CodeSource::Local(lc) => {
+                    return Some(lc.path().clone());
+                }
+                _ => {
+                    return None;
+                }
+            },
+            TaskType::InstallFromPrebuilt(ps) => match ps {
+                PrebuiltSource::Local(lc) => {
+                    return Some(lc.path().clone());
+                }
+                _ => {
+                    return None;
+                }
+            },
+        }
+    }
 }
 
 /// @brief 构建配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfig {
     /// 构建命令
-    pub build_command: String,
+    pub build_command: Option<String>,
 }
 
 impl BuildConfig {
     #[allow(dead_code)]
-    pub fn new(build_command: String) -> Self {
+    pub fn new(build_command: Option<String>) -> Self {
         Self { build_command }
     }
 
@@ -139,7 +188,9 @@ impl BuildConfig {
     }
 
     pub fn trim(&mut self) {
-        self.build_command = self.build_command.trim().to_string();
+        if let Some(build_command) = &mut self.build_command {
+            *build_command = build_command.trim().to_string();
+        }
     }
 }
 
@@ -147,26 +198,22 @@ impl BuildConfig {
 pub struct InstallConfig {
     /// 安装到DragonOS内的目录
     pub in_dragonos_path: PathBuf,
-    /// 安装命令
-    pub install_command: String,
 }
 
 impl InstallConfig {
     #[allow(dead_code)]
-    pub fn new(in_dragonos_path: PathBuf, install_command: String) -> Self {
-        Self {
-            in_dragonos_path,
-            install_command,
-        }
+    pub fn new(in_dragonos_path: PathBuf) -> Self {
+        Self { in_dragonos_path }
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        if self.in_dragonos_path.is_relative() {
+            return Err("InstallConfig: in_dragonos_path should be an Absolute path".to_string());
+        }
         return Ok(());
     }
 
-    pub fn trim(&mut self) {
-        self.install_command = self.install_command.trim().to_string();
-    }
+    pub fn trim(&mut self) {}
 }
 
 /// @brief 依赖项
@@ -212,7 +259,7 @@ pub enum TaskType {
 }
 
 impl TaskType {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<(), String> {
         match self {
             TaskType::BuildFromSource(source) => source.validate(),
             TaskType::InstallFromPrebuilt(source) => source.validate(),
@@ -239,7 +286,7 @@ pub enum CodeSource {
 }
 
 impl CodeSource {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<(), String> {
         match self {
             CodeSource::Git(source) => source.validate(),
             CodeSource::Local(source) => source.validate(Some(false)),
@@ -281,118 +328,6 @@ impl PrebuiltSource {
     }
 }
 
-/// # Git源
-///
-/// 从Git仓库获取源码
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitSource {
-    /// Git仓库地址
-    url: String,
-    /// 分支
-    branch: String,
-    /// 特定的提交的hash值（可选，如果为空，则拉取最新提交）
-    revision: Option<String>,
-}
-
-impl GitSource {
-    pub fn new(url: String, branch: String, revision: Option<String>) -> Self {
-        Self {
-            url,
-            branch,
-            revision,
-        }
-    }
-
-    /// # 验证参数合法性
-    ///
-    /// 仅进行形式校验，不会检查Git仓库是否存在，以及分支是否存在、是否有权限访问等
-    pub fn validate(&self) -> Result<(), String> {
-        if self.url.is_empty() {
-            return Err("url is empty".to_string());
-        }
-        if self.branch.is_empty() {
-            return Err("branch is empty".to_string());
-        }
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {
-        self.url = self.url.trim().to_string();
-        self.branch = self.branch.trim().to_string();
-        if let Some(revision) = &mut self.revision {
-            *revision = revision.trim().to_string();
-        }
-    }
-}
-
-/// # 本地源
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LocalSource {
-    /// 本地目录/文件的路径
-    path: PathBuf,
-}
-
-impl LocalSource {
-    #[allow(dead_code)]
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-
-    pub fn validate(&self, expect_file: Option<bool>) -> Result<(), String> {
-        if !self.path.exists() {
-            return Err(format!("path {:?} not exists", self.path));
-        }
-
-        if let Some(expect_file) = expect_file {
-            if expect_file && !self.path.is_file() {
-                return Err(format!("path {:?} is not a file", self.path));
-            }
-
-            if !expect_file && !self.path.is_dir() {
-                return Err(format!("path {:?} is not a directory", self.path));
-            }
-        }
-
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {}
-}
-
-/// # 在线压缩包源
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArchiveSource {
-    /// 压缩包的URL
-    url: String,
-}
-
-impl ArchiveSource {
-    #[allow(dead_code)]
-    pub fn new(url: String) -> Self {
-        Self { url }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        if self.url.is_empty() {
-            return Err("url is empty".to_string());
-        }
-
-        // 判断是一个网址
-        if let Ok(url) = Url::parse(&self.url) {
-            if url.scheme() != "http" && url.scheme() != "https" {
-                return Err(format!("url {:?} is not a http/https url", self.url));
-            }
-        } else {
-            return Err(format!("url {:?} is not a valid url", self.url));
-        }
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {
-        self.url = self.url.trim().to_string();
-    }
-}
-
 /// # 任务环境变量
 ///
 /// 任务执行时的环境变量.这个环境变量是在当前任务执行时设置的，不会影响到其他任务
@@ -403,6 +338,7 @@ pub struct TaskEnv {
 }
 
 impl TaskEnv {
+    #[allow(dead_code)]
     pub fn new(key: String, value: String) -> Self {
         Self { key, value }
     }
