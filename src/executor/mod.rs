@@ -10,7 +10,7 @@ use std::{
 use log::{error, info, warn};
 
 use crate::{
-    console::Action,
+    console::{clean::CleanLevel, Action},
     executor::cache::CacheDir,
     parser::task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
     scheduler::{SchedEntities, SchedEntity},
@@ -103,6 +103,10 @@ impl Executor {
                 // 把构建结果安装到DragonOS
                 self.install()?;
             }
+            Action::Clean(_) => {
+                // 清理构建结果
+                self.clean()?;
+            }
             _ => {
                 error!("Unsupported action: {:?}", self.action);
             }
@@ -193,6 +197,93 @@ impl Executor {
         return Ok(());
     }
 
+    fn clean(&self) -> Result<(), ExecutorError> {
+        let level = if let Action::Clean(l) = self.action {
+            l.level
+        } else {
+            panic!(
+                "BUG: clean() called with non-clean action. executor details: {:?}",
+                self
+            );
+        };
+        info!(
+            "Cleaning task: {}, level={level}",
+            self.entity.task().name_version()
+        );
+
+        let r: Result<(), ExecutorError> = match level {
+            CleanLevel::All => self.clean_all(),
+            CleanLevel::Src => self.clean_src(),
+            CleanLevel::Target => self.clean_target(),
+            CleanLevel::Cache => self.clean_cache(),
+        };
+
+        if let Err(e) = r {
+            error!(
+                "Failed to clean task: {}, error message: {:?}",
+                self.entity.task().name_version(),
+                e
+            );
+            return Err(e);
+        }
+
+        return Ok(());
+    }
+
+    fn clean_all(&self) -> Result<(), ExecutorError> {
+        // 在源文件目录执行清理
+        self.clean_src()?;
+        // 清理构建结果
+        self.clean_target()?;
+        // 清理缓存
+        self.clean_cache()?;
+        return Ok(());
+    }
+
+    /// 在源文件目录执行清理
+    fn clean_src(&self) -> Result<(), ExecutorError> {
+        let cmd: Option<Command> = self.create_command()?;
+        if cmd.is_none() {
+            // 如果这里没有命令，则认为用户不需要在源文件目录执行清理
+            return Ok(());
+        }
+        info!(
+            "{}: Cleaning in source directory: {:?}",
+            self.entity.task().name_version(),
+            self.src_work_dir()
+        );
+
+        let cmd = cmd.unwrap();
+        self.run_command(cmd)?;
+        return Ok(());
+    }
+
+    /// 清理构建输出目录
+    fn clean_target(&self) -> Result<(), ExecutorError> {
+        info!(
+            "{}: Cleaning build target directory: {:?}",
+            self.entity.task().name_version(),
+            self.build_dir.path
+        );
+        return self.build_dir.remove_self_recursive();
+    }
+
+    /// 清理下载缓存
+    fn clean_cache(&self) -> Result<(), ExecutorError> {
+        let cache_dir = self.source_dir.as_ref();
+        if cache_dir.is_none() {
+            // 如果没有缓存目录，则认为用户不需要清理缓存
+            return Ok(());
+        }
+        info!(
+            "{}: Cleaning cache directory: {}",
+            self.entity.task().name_version(),
+            self.src_work_dir().display()
+        );
+
+        return cache_dir.unwrap().remove_self_recursive();
+    }
+
     /// 获取源文件的工作目录
     fn src_work_dir(&self) -> PathBuf {
         if let Some(local_path) = self.entity.task().source_path() {
@@ -206,7 +297,14 @@ impl Executor {
     fn create_command(&self) -> Result<Option<Command>, ExecutorError> {
         // 获取命令
         let raw_cmd = match self.entity.task().task_type {
-            TaskType::BuildFromSource(_) => self.entity.task().build.build_command.clone(),
+            TaskType::BuildFromSource(_) => match self.action {
+                Action::Build => self.entity.task().build.build_command.clone(),
+                Action::Clean(_) => self.entity.task().clean.clean_command.clone(),
+                _ => unimplemented!(
+                    "create_command: Action {:?} not supported yet.",
+                    self.action
+                ),
+            },
             _ => None,
         };
 
@@ -384,6 +482,7 @@ impl EnvVar {
 }
 
 /// # 任务执行器错误枚举
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ExecutorError {
     /// 准备执行环境错误
@@ -393,6 +492,8 @@ pub enum ExecutorError {
     TaskFailed(String),
     /// 安装错误
     InstallError(String),
+    /// 清理错误
+    CleanError(String),
 }
 
 /// # 准备全局环境变量

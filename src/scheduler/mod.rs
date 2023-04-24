@@ -285,6 +285,25 @@ impl Scheduler {
 
     /// # 执行调度器中的所有任务
     pub fn run(&self) -> Result<(), SchedulerError> {
+        // 准备全局环境变量
+        crate::executor::prepare_env(&self.target)
+            .map_err(|e| SchedulerError::RunError(format!("{:?}", e)))?;
+
+        match self.action {
+            Action::Build | Action::Install => {
+                self.run_with_topo_sort()?;
+            }
+            Action::Clean(_) => self.run_without_topo_sort()?,
+            Action::Uninstall => todo!(),
+        }
+
+        return Ok(());
+    }
+
+    /// Action需要按照拓扑序执行
+    ///
+    /// Action::Build | Action::Install
+    fn run_with_topo_sort(&self) -> Result<(), SchedulerError> {
         // 检查是否有不存在的依赖
         let r = self.check_not_exists_dependency();
         if r.is_err() {
@@ -295,10 +314,40 @@ impl Scheduler {
         // 对调度实体进行拓扑排序
         let r: Vec<Rc<SchedEntity>> = self.target.topo_sort();
 
-        crate::executor::prepare_env(&self.target)
-            .map_err(|e| SchedulerError::RunError(format!("{:?}", e)))?;
-
         for entity in r.iter() {
+            let mut executor = Executor::new(
+                entity.clone(),
+                self.action.clone(),
+                self.dragonos_dir.clone(),
+            )
+            .map_err(|e| {
+                error!(
+                    "Error while creating executor for task {} : {:?}",
+                    entity.task().name_version(),
+                    e
+                );
+                exit(-1);
+            })
+            .unwrap();
+
+            executor
+                .execute()
+                .map_err(|e| {
+                    error!(
+                        "Error while executing task {} : {:?}",
+                        entity.task().name_version(),
+                        e
+                    );
+                    exit(-1);
+                })
+                .unwrap();
+        }
+        return Ok(());
+    }
+
+    /// Action不需要按照拓扑序执行
+    fn run_without_topo_sort(&self) -> Result<(), SchedulerError> {
+        for entity in self.target.iter() {
             let mut executor = Executor::new(
                 entity.clone(),
                 self.action.clone(),

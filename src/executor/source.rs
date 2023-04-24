@@ -3,7 +3,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use log::{debug, info};
+use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
@@ -104,7 +104,7 @@ impl GitSource {
                 target_dir.path.display()
             )
         })? {
-            debug!("Target dir is empty, cloning repo");
+            info!("Target dir is empty, cloning repo");
             self.clone_repo(target_dir)?;
         }
 
