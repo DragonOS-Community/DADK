@@ -24,6 +24,8 @@ pub struct DADKTask {
     pub build: BuildConfig,
     /// 安装配置
     pub install: InstallConfig,
+    /// 清理配置
+    pub clean: CleanConfig,
     /// 环境变量
     pub envs: Option<Vec<TaskEnv>>,
 }
@@ -38,6 +40,7 @@ impl DADKTask {
         depends: Vec<Dependency>,
         build: BuildConfig,
         install: InstallConfig,
+        clean: CleanConfig,
         envs: Option<Vec<TaskEnv>>,
     ) -> Self {
         Self {
@@ -48,6 +51,7 @@ impl DADKTask {
             depends,
             build,
             install,
+            clean,
             envs,
         }
     }
@@ -63,6 +67,7 @@ impl DADKTask {
         self.build.validate()?;
         self.validate_build_type()?;
         self.install.validate()?;
+        self.clean.validate()?;
         self.validate_depends()?;
         self.validate_envs()?;
 
@@ -76,6 +81,7 @@ impl DADKTask {
         self.task_type.trim();
         self.build.trim();
         self.install.trim();
+        self.clean.trim();
         self.trim_depends();
         self.trim_envs();
     }
@@ -214,6 +220,30 @@ impl InstallConfig {
     }
 
     pub fn trim(&mut self) {}
+}
+
+/// # 清理配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanConfig {
+    /// 清理命令
+    pub clean_command: Option<String>,
+}
+
+impl CleanConfig {
+    #[allow(dead_code)]
+    pub fn new(clean_command: Option<String>) -> Self {
+        Self { clean_command }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        return Ok(());
+    }
+
+    pub fn trim(&mut self) {
+        if let Some(clean_command) = &mut self.clean_command {
+            *clean_command = clean_command.trim().to_string();
+        }
+    }
 }
 
 /// @brief 依赖项

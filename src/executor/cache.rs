@@ -1,6 +1,6 @@
 use std::{path::PathBuf, rc::Rc};
 
-use log::{debug, info};
+use log::info;
 
 use crate::{
     parser::task::{CodeSource, DADKTask, TaskType},
@@ -164,7 +164,7 @@ impl CacheDir {
         if !self.path.exists() {
             info!("Cache dir not exists, create it: {:?}", self.path);
             std::fs::create_dir_all(&self.path).map_err(|e| ExecutorError::IoError(e))?;
-            debug!("Cache dir: [{:?}] created.", self.path);
+            info!("Cache dir: [{:?}] created.", self.path);
         } else if !self.path.is_dir() {
             // 如果路径类别不是目录，则报错
             return Err(ExecutorError::IoError(std::io::Error::new(
@@ -187,5 +187,17 @@ impl CacheDir {
         }
 
         return Ok(true);
+    }
+
+    /// # 递归删除自身目录
+    /// 递归删除自身目录，如果目录不存在，则忽略
+    ///
+    /// 请注意，这会删除整个目录，包括目录下的所有文件和子目录
+    pub fn remove_self_recursive(&self) -> Result<(), ExecutorError> {
+        let path = &self.path;
+        if path.exists() {
+            std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e))?;
+        }
+        return Ok(());
     }
 }
