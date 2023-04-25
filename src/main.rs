@@ -19,7 +19,7 @@
 //!
 //! ## License
 //!
-//! DADK is licensed under the [GPLv2 License](LICENSE).
+//! DADK is licensed under the [GPLv2 License](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
 //! 
 //! ## 快速开始
 //! 
