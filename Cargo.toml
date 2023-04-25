@@ -4,6 +4,9 @@ authors = ["longjin <longjin@DragonOS.org>"]
 version = "0.1.0"
 edition = "2021"
 description = "DragonOS Application Development Kit\nDragonOS应用开发工具"
+license = "GPLv2"
+repository = "https://github.com/DragonOS-Community/DADK.git"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

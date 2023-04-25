@@ -5,8 +5,14 @@ use serde::{Deserialize, Serialize};
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
 
 // 对于生成的包名和版本号，需要进行替换的字符。
-pub static NAME_VERSION_REPLACE_TABLE: [(&str, &str); 4] =
-    [(" ", "_"), ("\t", "_"), ("-", "_"), (".", "_")];
+pub static NAME_VERSION_REPLACE_TABLE: [(&str, &str); 6] = [
+    (" ", "_"),
+    ("\t", "_"),
+    ("-", "_"),
+    (".", "_"),
+    ("+", "_"),
+    ("*", "_"),
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DADKTask {
@@ -203,23 +209,30 @@ impl BuildConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallConfig {
     /// 安装到DragonOS内的目录
-    pub in_dragonos_path: PathBuf,
+    pub in_dragonos_path: Option<PathBuf>,
 }
 
 impl InstallConfig {
     #[allow(dead_code)]
-    pub fn new(in_dragonos_path: PathBuf) -> Self {
+    pub fn new(in_dragonos_path: Option<PathBuf>) -> Self {
         Self { in_dragonos_path }
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.in_dragonos_path.is_relative() {
+        if self.in_dragonos_path.is_none() {
+            return Ok(());
+        }
+        if self.in_dragonos_path.as_ref().unwrap().is_relative() {
             return Err("InstallConfig: in_dragonos_path should be an Absolute path".to_string());
         }
         return Ok(());
     }
 
-    pub fn trim(&mut self) {}
+    pub fn trim(&mut self) {
+        if let Some(in_dragonos_path) = &mut self.in_dragonos_path {
+            *in_dragonos_path = in_dragonos_path.canonicalize().unwrap();
+        }
+    }
 }
 
 /// # 清理配置
