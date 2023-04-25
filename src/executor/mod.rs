@@ -105,7 +105,10 @@ impl Executor {
             }
             Action::Clean(_) => {
                 // 清理构建结果
-                self.clean()?;
+                let r = self.clean();
+                if let Err(e) = r {
+                    error!("Failed to clean task {}: {:?}", self.entity.task().name_version(), e);
+                }
             }
             _ => {
                 error!("Unsupported action: {:?}", self.action);
@@ -138,15 +141,14 @@ impl Executor {
 
     /// # 执行安装操作，把构建结果安装到DragonOS
     fn install(&self) -> Result<(), ExecutorError> {
+        let in_dragonos_path = self.entity.task().install.in_dragonos_path.as_ref();
+        // 如果没有指定安装路径，则不执行安装
+        if in_dragonos_path.is_none() {
+            return Ok(());
+        }
         info!("Installing task: {}", self.entity.task().name_version());
+        let mut in_dragonos_path = in_dragonos_path.unwrap().to_string_lossy().to_string();
 
-        let mut in_dragonos_path = self
-            .entity
-            .task()
-            .install
-            .in_dragonos_path
-            .to_string_lossy()
-            .to_string();
         // 去除开头的斜杠
         {
             let count_leading_slashes = in_dragonos_path.chars().take_while(|c| *c == '/').count();

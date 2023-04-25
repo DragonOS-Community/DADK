@@ -294,7 +294,7 @@ impl Scheduler {
                 self.run_with_topo_sort()?;
             }
             Action::Clean(_) => self.run_without_topo_sort()?,
-            Action::Uninstall => todo!(),
+            _ => unimplemented!(),            
         }
 
         return Ok(());

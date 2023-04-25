@@ -1,4 +1,20 @@
+//! # DADK控制台
+//! 
+//! DADK控制台能够让用户通过命令行交互的方式使用DADK。
+//! 
+//! ## 创建配置文件
+//! 
+//! DADK控制台提供了一个命令，用于创建一个配置文件。您可以通过以下命令创建一个配置文件：
+//! 
+//! ```bash
+//! dadk new
+//! ```
+//! 
+
 pub mod clean;
+pub mod elements;
+pub mod interactive;
+pub mod new_config;
 
 use std::path::PathBuf;
 
@@ -49,7 +65,16 @@ pub enum Action {
     Install,
     /// 尚不支持
     Uninstall,
+    /// 使用交互式命令行创建dadk任务配置文件
+    New,
 }
 
-#[derive(Debug, Clone)]
-pub enum ConsoleError {}
+#[derive(Debug)]
+pub enum ConsoleError {
+    CommandError(String),
+    IOError(std::io::Error),
+    /// 错误次数超过限制
+    RetryLimitExceeded(String),
+    /// 无效的输入
+    InvalidInput(String),
+}
