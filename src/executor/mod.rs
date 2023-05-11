@@ -7,7 +7,7 @@ use std::{
     sync::RwLock,
 };
 
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 
 use crate::{
     console::{clean::CleanLevel, Action},
@@ -149,6 +149,7 @@ impl Executor {
         info!("Installing task: {}", self.entity.task().name_version());
         let mut in_dragonos_path = in_dragonos_path.unwrap().to_string_lossy().to_string();
 
+        debug!("in_dragonos_path: {}", in_dragonos_path);
         // 去除开头的斜杠
         {
             let count_leading_slashes = in_dragonos_path.chars().take_while(|c| *c == '/').count();
@@ -156,7 +157,7 @@ impl Executor {
         }
         // 拼接最终的安装路径
         let install_path = self.dragonos_sysroot.join(in_dragonos_path);
-        // debug!("install_path: {:?}", install_path);
+        debug!("install_path: {:?}", install_path);
         // 创建安装路径
         std::fs::create_dir_all(&install_path).map_err(|e| {
             ExecutorError::InstallError(format!("Failed to create install path: {}", e.to_string()))

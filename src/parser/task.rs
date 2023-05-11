@@ -228,11 +228,7 @@ impl InstallConfig {
         return Ok(());
     }
 
-    pub fn trim(&mut self) {
-        if let Some(in_dragonos_path) = &mut self.in_dragonos_path {
-            *in_dragonos_path = in_dragonos_path.canonicalize().unwrap();
-        }
-    }
+    pub fn trim(&mut self) {}
 }
 
 /// # 清理配置
