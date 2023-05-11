@@ -28,7 +28,7 @@ use std::{
     path::PathBuf,
 };
 
-use log::{error, info};
+use log::{error, info, debug};
 
 use self::task::DADKTask;
 pub mod task;
@@ -181,6 +181,7 @@ impl Parser {
         let mut result_vec = Vec::new();
         for config_file in &self.config_files {
             let task: DADKTask = self.parse_config_file(config_file)?;
+            debug!("Parsed config file {}: {:?}", config_file.display(), task);
             result_vec.push((config_file.clone(), task));
         }
 
@@ -208,6 +209,8 @@ impl Parser {
             config_file: Some(config_file.clone()),
             error: InnerParserError::JsonError(e),
         })?;
+
+        debug!("Parsed config file {}: {:?}", config_file.display(), task);
 
         // 去除字符串中的空白字符
         task.trim();
