@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
