@@ -295,6 +295,7 @@ pub enum TaskType {
     BuildFromSource(CodeSource),
     /// 从预编译包安装
     InstallFromPrebuilt(PrebuiltSource),
+
 }
 
 impl TaskType {
@@ -332,7 +333,6 @@ impl CodeSource {
             CodeSource::Archive(source) => source.validate(),
         }
     }
-
     pub fn trim(&mut self) {
         match self {
             CodeSource::Git(source) => source.trim(),

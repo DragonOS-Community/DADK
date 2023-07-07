@@ -375,7 +375,11 @@ impl Executor {
                     // 本地源文件，不需要拉取
                     CodeSource::Local(_) => return Ok(()),
                     // 在线压缩包，需要下载
-                    CodeSource::Archive(_) => todo!(),
+                    CodeSource::Archive(archive) => 
+                    {
+                        archive.install(source_dir)
+                        .map_err(|e|ExecutorError::PrepareEnvError(e))?;   
+                    },
                 }
             }
             TaskType::InstallFromPrebuilt(pb) => {
@@ -383,7 +387,11 @@ impl Executor {
                     // 本地源文件，不需要拉取
                     PrebuiltSource::Local(_) => return Ok(()),
                     // 在线压缩包，需要下载
-                    PrebuiltSource::Archive(_) => todo!(),
+                    PrebuiltSource::Archive(archive) => 
+                    {
+                        archive.install(source_dir)
+                        .map_err(|e|ExecutorError::PrepareEnvError(e))?;
+                    },
                 }
             }
         }

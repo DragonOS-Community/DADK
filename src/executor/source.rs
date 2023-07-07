@@ -3,6 +3,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+
 use log::info;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -356,7 +357,6 @@ impl ArchiveSource {
     pub fn new(url: String) -> Self {
         Self { url }
     }
-
     pub fn validate(&self) -> Result<(), String> {
         if self.url.is_empty() {
             return Err("url is empty".to_string());
@@ -375,5 +375,55 @@ impl ArchiveSource {
 
     pub fn trim(&mut self) {
         self.url = self.url.trim().to_string();
+    }
+
+
+    pub fn install(&self, target_dir: &CacheDir)->Result<(),String>
+    {
+        let path: &PathBuf = &target_dir.path;
+        let mut cmd = Command::new("wget");
+        cmd.current_dir(path);
+        cmd.arg(&self.url);
+
+        let proc: std::process::Child = cmd
+        .stderr(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .spawn()
+        .map_err(|e|e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e|e.to_string())?;
+
+        if !output.status.success(){
+            return Err(format!(
+                "download archive failed, status: {:?}, stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ))
+        }
+        //下载成功，开始尝试解压
+        else {
+        let url = Url::parse(&self.url).unwrap();
+        let filename = url.path_segments().unwrap().last().unwrap();
+        //TODO 适配不同类型的压缩文件
+        let mut cmd = Command::new("tar");
+        cmd.current_dir(path);
+        cmd.arg("-xvf").arg(filename);
+                let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .stdout(Stdio::inherit())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "unzip failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+    }
+        
+
+        return Ok(())
     }
 }
