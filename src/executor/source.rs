@@ -406,7 +406,7 @@ impl ArchiveSource {
         //TODO 适配不同类型的压缩文件
         let mut cmd = Command::new("tar");
         cmd.current_dir(path);
-        cmd.arg("-xvf").arg(filename);
+        cmd.arg("-xzf").arg(filename);
                 let proc: std::process::Child = cmd
             .stderr(Stdio::piped())
             .stdout(Stdio::inherit())
