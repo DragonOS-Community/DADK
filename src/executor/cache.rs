@@ -154,7 +154,7 @@ impl CacheDir {
             }
         } else if let TaskType::InstallFromPrebuilt(ps) = task_type {
             match ps {
-                crate::parser::task::PrebuiltSource::Archive(_) => return true,
+                crate::parser::task::PrebuiltSource::Archive(_) => return false,
                 crate::parser::task::PrebuiltSource::Local(_) => return false,
             }
         }

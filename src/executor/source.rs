@@ -1,10 +1,9 @@
 use std::{
-    path::PathBuf,
+    path:: {PathBuf,Path},
     process::{Command, Stdio},
 };
 
-
-use log::info;
+use log::{info, warn};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
@@ -377,37 +376,39 @@ impl ArchiveSource {
         self.url = self.url.trim().to_string();
     }
 
-
-    pub fn install(&self, target_dir: &CacheDir)->Result<(),String>
-    {
+    pub fn install(&self, target_dir: &CacheDir) -> Result<(), String> {
+        let url = Url::parse(&self.url).unwrap();
+        let archive_name = url.path_segments().unwrap().last().unwrap();
         let path: &PathBuf = &target_dir.path;
+        let mut existcheck: PathBuf = path.clone();
+        existcheck.push(archive_name);
+        if existcheck.exists() {
+            warn!("{:?} already exist, trying to remove", archive_name);
+            let mut cmd = Command::new("rm");
+            cmd.current_dir(path);
+            cmd.arg("-f");
+            cmd.arg(archive_name);
+            let proc: std::process::Child = cmd
+                .stderr(Stdio::piped())
+                .stdout(Stdio::inherit())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+            let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+            if !output.status.success() {
+                warn!(
+                    "remove archive failed, status: {:?},  stderr: {:?}",
+                    output.status,
+                    StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                );
+            }
+        }
+        info!("downloading {:?}", archive_name);
         let mut cmd = Command::new("wget");
         cmd.current_dir(path);
         cmd.arg(&self.url);
 
         let proc: std::process::Child = cmd
-        .stderr(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .spawn()
-        .map_err(|e|e.to_string())?;
-        let output = proc.wait_with_output().map_err(|e|e.to_string())?;
-
-        if !output.status.success(){
-            return Err(format!(
-                "download archive failed, status: {:?}, stderr: {:?}",
-                output.status,
-                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-            ))
-        }
-        //下载成功，开始尝试解压
-        else {
-        let url = Url::parse(&self.url).unwrap();
-        let filename = url.path_segments().unwrap().last().unwrap();
-        //TODO 适配不同类型的压缩文件
-        let mut cmd = Command::new("tar");
-        cmd.current_dir(path);
-        cmd.arg("-xzf").arg(filename);
-                let proc: std::process::Child = cmd
             .stderr(Stdio::piped())
             .stdout(Stdio::inherit())
             .spawn()
@@ -416,14 +417,143 @@ impl ArchiveSource {
 
         if !output.status.success() {
             return Err(format!(
-                "unzip failed, status: {:?},  stderr: {:?}",
+                "download archive failed, status: {:?}, stderr: {:?}",
                 output.status,
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
             ));
         }
-    }
-        
+        //下载成功，开始尝试解压
+        else {
+            info!("download {:?} finished, start unzip", archive_name);
+            //TODO 适配不同类型的压缩文件,现在只适配了tar.gz
+            let temppath = Path::new(archive_name);
+            let foldername = Path::new(temppath.file_stem().unwrap().to_str().unwrap())
+                                        .file_stem().unwrap().to_str().unwrap();
+            let mut cmd = Command::new("tar");
+            cmd.current_dir(path);
+            cmd.arg("-xzf").arg(archive_name);
+            let proc: std::process::Child = cmd 
+                .stderr(Stdio::piped())
+                .stdout(Stdio::inherit())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+            let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+            if !output.status.success() {
+                return Err(format!(
+                    "unzip failed, status: {:?},  stderr: {:?}",
+                    output.status,
+                    StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                ));
+            }
+            //从解压的文件夹中提取出文件并删除下载的压缩包
+            else {
 
-        return Ok(())
+                //删除下载的压缩包
+                info!("unzip successfully, removing archive ");
+                let mut cmd = Command::new("rm");
+                cmd.current_dir(path);
+                cmd.arg("-f");
+                cmd.arg(archive_name);
+
+                let proc: std::process::Child = cmd
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::inherit())
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+                let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+                if !output.status.success() {
+                    warn!(
+                        "remove archive failed, status: {:?},  stderr: {:?}",
+                        output.status,
+                        StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                    );
+                }
+
+                //把文件从单独的文件夹中提取出来
+                let mut cmd = "mv ".to_string();
+                cmd += &foldername;
+                cmd += "/.[!.]*";
+                cmd += " .";
+                info!("cmd:{:?}", cmd);
+                let proc: std::process::Child = Command::new("bash")
+                    .current_dir(path)
+                    .arg("-c")
+                    .arg(cmd)
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::inherit())
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+                let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+                if !output.status.success() {
+                    warn!(
+                        "extract files from folder failed, status: {:?},  stderr: {:?}",
+                        output.status,
+                        StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                    );
+                }
+                
+                let mut cmd = "mv ".to_string();
+                cmd += &foldername;
+                cmd += "/*";
+                cmd += " .";
+                info!("cmd:{:?}", cmd);
+                let proc: std::process::Child = Command::new("bash")
+                    .current_dir(path)
+                    .arg("-c")
+                    .arg(cmd)
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::inherit())
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+                let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+                if !output.status.success() {
+                    warn!(
+                        "extract files from folder failed, status: {:?},  stderr: {:?}",
+                        output.status,
+                        StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                    );
+                }
+
+                // let folder = Path::new(&foldername);
+                // for entry in fs::read_dir(folder){
+                //     let entry = entry;
+                //     let path = entry.path();
+                //     fs::copy(path, path.file_name().unwrap());
+                // }
+                //删除空的单独文件夹
+                let mut cmd = "rm -r ".to_string();
+                cmd += &foldername;
+                info!("cmd:{:?}", cmd);
+                let proc: std::process::Child = Command::new("bash")
+                    .current_dir(path)
+                    .arg("-c")
+                    .arg(cmd)
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::inherit())
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+                let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+                if !output.status.success() {
+                    warn!(
+                        "remove empty folder failed, status: {:?},  stderr: {:?}",
+                        output.status,
+                        StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                    );
+                }
+    
+            }
+        }
+
+        return Ok(());
     }
 }
+
+
+// enum ArchiveFile {
+//     tar_gz(String),
+// }
+
+// impl ArchiveFile {
+    
+// }

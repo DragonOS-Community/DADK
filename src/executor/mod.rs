@@ -308,7 +308,17 @@ impl Executor {
                     self.action
                 ),
             },
-            _ => None,
+
+            TaskType::InstallFromPrebuilt(_)=> match self.action
+            {
+                Action::Build => self.entity.task().build.build_command.clone(),
+                 Action::Clean(_)=> self.entity.task().clean.clean_command.clone(),
+                 _=> unimplemented!(
+                    "create_command: Action {:?} not supported yet.",
+                    self.action
+                ),
+            },
+
         };
 
         if raw_cmd.is_none() {
@@ -364,7 +374,6 @@ impl Executor {
         }
         let task = self.entity.task();
         let source_dir = self.source_dir.as_ref().unwrap();
-
         match &task.task_type {
             TaskType::BuildFromSource(cs) => {
                 match cs {
@@ -389,7 +398,7 @@ impl Executor {
                     // 在线压缩包，需要下载
                     PrebuiltSource::Archive(archive) => 
                     {
-                        archive.install(source_dir)
+                        archive.install(&self.build_dir)
                         .map_err(|e|ExecutorError::PrepareEnvError(e))?;
                     },
                 }
