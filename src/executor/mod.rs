@@ -292,7 +292,6 @@ impl Executor {
         if let Some(local_path) = self.entity.task().source_path() {
             return local_path;
         }
-
         return self.source_dir.as_ref().unwrap().path.clone();
     }
 
