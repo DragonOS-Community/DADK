@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use log::info;
 use serde::{Deserialize, Serialize};
 
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
@@ -143,7 +142,7 @@ impl DADKTask {
     }
 
     pub fn name_version(&self) -> String {
-        return format!("{}-{}", self.name, self.version);
+        return format!("{}-{}", self.name.replace(" ", "_"), self.version);
     }
 
     pub fn name_version_env(&self) -> String {
