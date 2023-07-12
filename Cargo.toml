@@ -1,6 +1,6 @@
 [package]
 name = "dadk"
-authors = ["longjin <longjin@DragonOS.org>"]
+authors = ["longjin <longjin@DragonOS.org>", "chikejian <chikejian@DragonOS.org>"]
 version = "0.1.2"
 edition = "2021"
 description = "DragonOS Application Development Kit\nDragonOS应用开发工具"

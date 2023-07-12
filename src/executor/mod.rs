@@ -7,7 +7,7 @@ use std::{
     sync::RwLock,
 };
 
-use log::{error, info, warn, debug};
+use log::{debug, error, info, warn};
 
 use crate::{
     console::{clean::CleanLevel, Action},
@@ -107,7 +107,11 @@ impl Executor {
                 // 清理构建结果
                 let r = self.clean();
                 if let Err(e) = r {
-                    error!("Failed to clean task {}: {:?}", self.entity.task().name_version(), e);
+                    error!(
+                        "Failed to clean task {}: {:?}",
+                        self.entity.task().name_version(),
+                        e
+                    );
                 }
             }
             _ => {
@@ -308,16 +312,14 @@ impl Executor {
                 ),
             },
 
-            TaskType::InstallFromPrebuilt(_)=> match self.action
-            {
+            TaskType::InstallFromPrebuilt(_) => match self.action {
                 Action::Build => self.entity.task().build.build_command.clone(),
-                 Action::Clean(_)=> self.entity.task().clean.clean_command.clone(),
-                 _=> unimplemented!(
+                Action::Clean(_) => self.entity.task().clean.clean_command.clone(),
+                _ => unimplemented!(
                     "create_command: Action {:?} not supported yet.",
                     self.action
                 ),
             },
-
         };
 
         if raw_cmd.is_none() {
@@ -368,13 +370,13 @@ impl Executor {
 
     fn prepare_input(&self) -> Result<(), ExecutorError> {
         // 拉取源文件
-        if self.source_dir.is_none() {
-            return Ok(());
-        }
         let task = self.entity.task();
-        let source_dir = self.source_dir.as_ref().unwrap();
         match &task.task_type {
             TaskType::BuildFromSource(cs) => {
+                if self.source_dir.is_none() {
+                    return Ok(());
+                }
+                let source_dir = self.source_dir.as_ref().unwrap();
                 match cs {
                     CodeSource::Git(git) => {
                         git.prepare(source_dir)
@@ -383,23 +385,54 @@ impl Executor {
                     // 本地源文件，不需要拉取
                     CodeSource::Local(_) => return Ok(()),
                     // 在线压缩包，需要下载
-                    CodeSource::Archive(archive) => 
-                    {
-                        archive.install(source_dir)
-                        .map_err(|e|ExecutorError::PrepareEnvError(e))?;   
-                    },
+                    CodeSource::Archive(archive) => {
+                        archive
+                            .install(source_dir)
+                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                    }
                 }
             }
             TaskType::InstallFromPrebuilt(pb) => {
                 match pb {
                     // 本地源文件，不需要拉取
-                    PrebuiltSource::Local(_) => return Ok(()),
+                    PrebuiltSource::Local(local_source) => {
+                        let local_path = local_source.path();
+                        let target_path = &self.build_dir.path;
+
+                        let mut cmd = "cp -r ".to_string();
+                        cmd += &(local_path.to_string_lossy().to_string() + "/* ");
+                        cmd += &(target_path.to_string_lossy().to_string());
+                        info!("-------cmd:{:?}", cmd);
+                        let proc: std::process::Child = Command::new("bash")
+                            .arg("-c")
+                            .arg(cmd)
+                            .stderr(Stdio::piped())
+                            .stdout(Stdio::inherit())
+                            .spawn()
+                            .map_err(|e| ExecutorError::PrepareEnvError(e.to_string()))?;
+                        let output = proc
+                            .wait_with_output()
+                            .map_err(|e| ExecutorError::PrepareEnvError(e.to_string()))?;
+
+                        if !output.status.success() {
+                            return Err(ExecutorError::PrepareEnvError(format!(
+                                "clear temp folder failed, status: {:?},  stderr: {:?}",
+                                output.status,
+                                StdioUtils::tail_n_str(
+                                    StdioUtils::stderr_to_lines(&output.stderr),
+                                    5
+                                )
+                            )));
+                        }
+
+                        return Ok(());
+                    }
                     // 在线压缩包，需要下载
-                    PrebuiltSource::Archive(archive) => 
-                    {
-                        archive.install(&self.build_dir)
-                        .map_err(|e|ExecutorError::PrepareEnvError(e))?;
-                    },
+                    PrebuiltSource::Archive(archive) => {
+                        archive
+                            .install(&self.build_dir)
+                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                    }
                 }
             }
         }

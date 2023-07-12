@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use log::info;
 use serde::{Deserialize, Serialize};
 
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
@@ -295,7 +296,6 @@ pub enum TaskType {
     BuildFromSource(CodeSource),
     /// 从预编译包安装
     InstallFromPrebuilt(PrebuiltSource),
-
 }
 
 impl TaskType {

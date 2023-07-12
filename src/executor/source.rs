@@ -1,10 +1,10 @@
 use log::{info, warn};
-use regex::{Captures, Regex};
+use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -376,6 +376,15 @@ impl ArchiveSource {
         self.url = self.url.trim().to_string();
     }
 
+    /// @brief 下载压缩包并把其中的文件提取至target_dir目录下
+    ///
+    ///从URL中下载压缩包到临时文件夹 target_dir/DRAGONOS_ARCHIVE_TEMP 后
+    ///原地解压，提取文件后删除下载的压缩包。如果 target_dir 非空，就直接使用
+    ///其中内容，不进行重复下载和覆盖
+    ///
+    /// @param target_dir 文件缓存目录
+    ///
+    /// @return 根据结果返回OK或Err
     pub fn install(&self, target_dir: &CacheDir) -> Result<(), String> {
         let url = Url::parse(&self.url).unwrap();
         let archive_name = url.path_segments().unwrap().last().unwrap();
@@ -389,13 +398,10 @@ impl ArchiveSource {
             warn!("source files already exist. If build failed, please run 'dadk_clean' before try again");
             return Ok(());
         }
-        let mut original_path: PathBuf = target_dir.path.clone();
-        original_path.push("DRAGONOS_ARCHIVE_TEMP");
-        let path = &original_path;
+        let path = &(target_dir.path.join("DRAGONOS_ARCHIVE_TEMP"));
         if path.exists() {
             info!("{:?} already exist, trying to clear", path);
             let cmd = "rm -rf ./*".to_string();
-            info!("cmd:{:?}", cmd);
             let proc: std::process::Child = Command::new("bash")
                 .current_dir(path)
                 .arg("-c")
@@ -440,15 +446,8 @@ impl ArchiveSource {
         //下载成功，开始尝试解压
         else {
             info!("download {:?} finished, start unzip", archive_name);
-            //TODO 适配不同类型的压缩文件,现在只适配了tar.gz
-            let archive_file = ArchiveFile::new(archive_name);
-            archive_file.unzip(path)?;
-            // let temppath = Path::new(archive_name);
-            // let foldername = Path::new(temppath.file_stem().unwrap().to_str().unwrap())
-            //     .file_stem()
-            //     .unwrap()
-            //     .to_str()
-            //     .unwrap();
+            let archive_file = ArchiveFile::new(&path.join(archive_name));
+            archive_file.unzip()?;
         }
         //删除创建的临时文件夹
         fs::remove_dir_all(path).map_err(|e| e.to_string())?;
@@ -457,22 +456,25 @@ impl ArchiveSource {
 }
 
 pub struct ArchiveFile {
+    archive_path: PathBuf,
     archive_name: String,
     filename: String,
     archive_type: ArchiveType,
 }
 
 impl ArchiveFile {
-    pub fn new(archive_name: &str) -> Self {
+    pub fn new(archive_path: &PathBuf) -> Self {
         //匹配压缩文件类型
+        let archive_name = archive_path.file_name().unwrap().to_str().unwrap();
         for (regex, archivetype) in [
             (Regex::new(r"^(.+)\.tar\.gz$").unwrap(), ArchiveType::TarGz),
-            (Regex::new(r"(.+)\.zip").unwrap(), ArchiveType::Zip),
+            (Regex::new(r"^(.+)\.zip$").unwrap(), ArchiveType::Zip),
         ] {
             if regex.is_match(archive_name) {
                 let captures = regex.captures(archive_name).unwrap();
                 let filename_without_extension = captures.get(1).unwrap().as_str();
                 return Self {
+                    archive_path: archive_path.parent().unwrap().to_path_buf(),
                     archive_name: archive_name.to_string(),
                     filename: filename_without_extension.to_string(),
                     archive_type: archivetype,
@@ -480,17 +482,42 @@ impl ArchiveFile {
             }
         }
         Self {
-            archive_name: "".to_string(),
+            archive_path: archive_path.parent().unwrap().to_path_buf(),
+            archive_name: archive_name.to_string(),
             filename: "".to_string(),
             archive_type: ArchiveType::Undefined,
         }
     }
 
-    pub fn unzip(&self, path: &PathBuf) -> Result<(), String> {
+    /// @brief 对self.archive_path路径下名为self.archive_name的压缩文件(tar.gz或zip)进行解压缩
+    ///
+    /// 在此函数中进行路径和文件名有效性的判断，如果有效的话就开始解压缩，根据ArchiveType枚举类型来
+    /// 生成不同的命令来对压缩文件进行解压缩，暂时只支持tar.gz和zip格式，并且都是通过调用bash来解压缩
+    /// 没有引入第三方rust库
+    ///
+    ///
+    /// @return 根据结果返回OK或Err
+    pub fn unzip(&self) -> Result<(), String> {
+        let path = &self.archive_path;
+        if !path.is_dir() {
+            return Err(format!("Archive directory {:?} is wrong", path));
+        }
+        if !path.join(&self.archive_name).is_file() {
+            return Err(format!(
+                " {:?} is not a file",
+                path.join(&self.archive_name)
+            ));
+        }
         let mut cmd = "".to_string();
+        //根据压缩文件的类型生成cmd指令
         match &self.archive_type {
             ArchiveType::TarGz => {
                 cmd += "tar -xzf ";
+                cmd += &self.archive_name;
+            }
+
+            ArchiveType::Zip => {
+                cmd += "unzip ";
                 cmd += &self.archive_name;
             }
             _ => {
@@ -540,7 +567,6 @@ impl ArchiveFile {
 
             //把文件从单独的文件夹中提取出来
             let cmd = "cd *;mv -f ./.[!.]* ../../;mv -f ./* ../../".to_string();
-            info!("cmd:{:?}", cmd);
             let proc: std::process::Child = Command::new("bash")
                 .current_dir(path)
                 .arg("-c")
@@ -560,7 +586,6 @@ impl ArchiveFile {
             //删除空的单独文件夹
             let mut cmd = "rm -rf ".to_string();
             cmd += &self.filename;
-            info!("cmd:{:?}", cmd);
             let proc: std::process::Child = Command::new("bash")
                 .current_dir(path)
                 .arg("-c")
@@ -579,7 +604,7 @@ impl ArchiveFile {
             }
         }
 
-        Ok(())
+        return Ok(());
     }
 }
 

@@ -132,12 +132,20 @@ impl CacheDir {
 
     pub fn build_dir_env_key(entity: &Rc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
-        return Ok(format!("{}_{}", Self::DADK_BUILD_CACHE_DIR_ENV_KEY_PREFIX,name_version_env));
+        return Ok(format!(
+            "{}_{}",
+            Self::DADK_BUILD_CACHE_DIR_ENV_KEY_PREFIX,
+            name_version_env
+        ));
     }
 
     pub fn source_dir_env_key(entity: &Rc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
-        return Ok(format!("{}_{}", Self::DADK_SOURCE_CACHE_DIR_ENV_KEY_PREFIX,name_version_env));
+        return Ok(format!(
+            "{}_{}",
+            Self::DADK_SOURCE_CACHE_DIR_ENV_KEY_PREFIX,
+            name_version_env
+        ));
     }
 
     pub fn need_source_cache(entity: &Rc<SchedEntity>) -> bool {
@@ -158,7 +166,6 @@ impl CacheDir {
                 crate::parser::task::PrebuiltSource::Local(_) => return false,
             }
         }
-
         unimplemented!("Not fully implemented task type: {:?}", task_type);
     }
 
