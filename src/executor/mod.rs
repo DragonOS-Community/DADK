@@ -402,7 +402,6 @@ impl Executor {
                         let mut cmd = "cp -r ".to_string();
                         cmd += &(local_path.to_string_lossy().to_string() + "/* ");
                         cmd += &(target_path.to_string_lossy().to_string());
-                        info!("-------cmd:{:?}", cmd);
                         let proc: std::process::Child = Command::new("bash")
                             .arg("-c")
                             .arg(cmd)
