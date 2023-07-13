@@ -1,15 +1,16 @@
-use log::{info, warn};
+use log::info;
 use regex::Regex;
-use reqwest::{blocking::Client, Url};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::os::unix::fs::PermissionsExt;
 use std::{
-    fs::{self, remove_dir_all, remove_file, File},
-    path::{Path, PathBuf},
+    fs::File,
+    path::PathBuf,
     process::{Command, Stdio},
 };
 use zip::ZipArchive;
 
-use crate::utils::stdio::StdioUtils;
+use crate::utils::{file::FileUtils, stdio::StdioUtils};
 
 use super::cache::CacheDir;
 
@@ -219,7 +220,6 @@ impl GitSource {
         }
         return Ok(());
     }
-
     /// # 把浅克隆的仓库变成深克隆
     fn unshallow(&self, target_dir: &CacheDir) -> Result<(), String> {
         let mut cmd = Command::new("git");
@@ -389,68 +389,34 @@ impl ArchiveSource {
     pub fn download_unzip(&self, target_dir: &CacheDir) -> Result<(), String> {
         let url = Url::parse(&self.url).unwrap();
         let archive_name = url.path_segments().unwrap().last().unwrap();
-        if !target_dir.is_empty().map_err(|e| {
-            format!(
-                "Failed to check if target dir is empty: {}, message: {e:?}",
-                target_dir.path.display()
-            )
-        })? {
+        let path = &(target_dir.path.join("DRAGONOS_ARCHIVE_TEMP"));
+        //如果source目录没有临时文件夹，且不为空，说明之前成功执行过一次，那么就直接使用之前的缓存
+        if !path.exists()
+            && !target_dir.is_empty().map_err(|e| {
+                format!(
+                    "Failed to check if target dir is empty: {}, message: {e:?}",
+                    target_dir.path.display()
+                )
+            })?
+        {
             //如果source文件夹非空，就直接使用，不再重复下载压缩文件，这里可以考虑加入交互
-            warn!("source files already exist. If build failed, please run 'dadk_clean' before try again");
+            info!("Source files already exist. Using previous source file cache. You should clean {:?} before re-download the archive ",target_dir);
             return Ok(());
         }
-        let path = &(target_dir.path.join("DRAGONOS_ARCHIVE_TEMP"));
-        if path.exists() {
-            remove_dir_all(path).map_err(|e| e.to_string())?;
-            // info!("{:?} already exist, trying to clear", path);
-            // let cmd = "rm -rf ./*".to_string();
-            // let proc: std::process::Child = Command::new("bash")
-            //     .current_dir(path)
-            //     .arg("-c")
-            //     .arg(cmd)
-            //     .stderr(Stdio::piped())
-            //     .stdout(Stdio::inherit())
-            //     .spawn()
-            //     .map_err(|e| e.to_string())?;
-            // let output = proc.wait_with_output().map_err(|e| e.to_string())?;
 
-            // if !output.status.success() {
-            //     return Err(format!(
-            //         "clear temp folder failed, status: {:?},  stderr: {:?}",
-            //         output.status,
-            //         StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-            //     ));
-            // }
+        if path.exists() {
+            std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
         }
         //创建临时目录
-        fs::create_dir(path).map_err(|e| e.to_string())?;
-
+        std::fs::create_dir(path).map_err(|e| e.to_string())?;
         info!("downloading {:?}", archive_name);
-        download_file(&self.url, path).map_err(|e| e.to_string())?;
-        // let mut cmd = Command::new("wget");
-        // cmd.current_dir(path);
-        // cmd.arg(&self.url);
-
-        // let proc: std::process::Child = cmd
-        //     .stderr(Stdio::piped())
-        //     .stdout(Stdio::inherit())
-        //     .spawn()
-        //     .map_err(|e| e.to_string())?;
-        // let output = proc.wait_with_output().map_err(|e| e.to_string())?;
-
-        // if !output.status.success() {
-        //     return Err(format!(
-        //         "download archive failed, status: {:?}, stderr: {:?}",
-        //         output.status,
-        //         StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-        //     ));
-        // }
+        FileUtils::download_file(&self.url, path).map_err(|e| e.to_string())?;
         //下载成功，开始尝试解压
         info!("download {:?} finished, start unzip", archive_name);
         let archive_file = ArchiveFile::new(&path.join(archive_name));
         archive_file.unzip()?;
         //删除创建的临时文件夹
-        fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+        std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
         return Ok(());
     }
 }
@@ -458,7 +424,6 @@ impl ArchiveSource {
 pub struct ArchiveFile {
     archive_path: PathBuf,
     archive_name: String,
-    filename: String,
     archive_type: ArchiveType,
 }
 
@@ -471,12 +436,9 @@ impl ArchiveFile {
             (Regex::new(r"^(.+)\.zip$").unwrap(), ArchiveType::Zip),
         ] {
             if regex.is_match(archive_name) {
-                let captures = regex.captures(archive_name).unwrap();
-                let filename_without_extension = captures.get(1).unwrap().as_str();
                 return Self {
                     archive_path: archive_path.parent().unwrap().to_path_buf(),
                     archive_name: archive_name.to_string(),
-                    filename: filename_without_extension.to_string(),
                     archive_type: archivetype,
                 };
             }
@@ -484,7 +446,6 @@ impl ArchiveFile {
         Self {
             archive_path: archive_path.parent().unwrap().to_path_buf(),
             archive_name: archive_name.to_string(),
-            filename: "".to_string(),
             archive_type: ArchiveType::Undefined,
         }
     }
@@ -497,6 +458,7 @@ impl ArchiveFile {
     ///
     ///
     /// @return 根据结果返回OK或Err
+
     pub fn unzip(&self) -> Result<(), String> {
         let path = &self.archive_path;
         if !path.is_dir() {
@@ -536,14 +498,13 @@ impl ArchiveFile {
                 let file = File::open(&self.archive_path.join(&self.archive_name))
                     .map_err(|e| e.to_string())?;
                 let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
-
                 for i in 0..archive.len() {
                     let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
                     let outpath = match file.enclosed_name() {
-                        Some(path) => self.archive_path.join(path.to_owned()),
+                        Some(path) => self.archive_path.join(path),
                         None => continue,
                     };
-                    if (&*file.name()).ends_with('/') {
+                    if (*file.name()).ends_with('/') {
                         std::fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
                     } else {
                         if let Some(p) = outpath.parent() {
@@ -554,86 +515,35 @@ impl ArchiveFile {
                         let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
                         std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
                     }
+                    //设置解压后权限，在Linux中Unzip会丢失权限
+                    #[cfg(unix)]
+                    {
+                        if let Some(mode) = file.unix_mode() {
+                            std::fs::set_permissions(
+                                &outpath,
+                                std::fs::Permissions::from_mode(mode),
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
+                    }
                 }
             }
             _ => {
                 return Err("unsupported archive type".to_string());
             }
         }
-
-        //从解压的文件夹中提取出文件并删除下载的压缩包
         //删除下载的压缩包
         info!("unzip successfully, removing archive ");
-        remove_file(path.join(&self.archive_name)).map_err(|e| e.to_string())?;
-        // let mut cmd = Command::new("rm");
-        // cmd.current_dir(path);
-        // cmd.arg("-f");
-        // cmd.arg(&self.archive_name);
-
-        // let proc: std::process::Child = cmd
-        //     .stderr(Stdio::piped())
-        //     .stdout(Stdio::inherit())
-        //     .spawn()
-        //     .map_err(|e| e.to_string())?;
-        // let output = proc.wait_with_output().map_err(|e| e.to_string())?;
-
-        // if !output.status.success() {
-        //     warn!(
-        //         "remove archive failed, status: {:?},  stderr: {:?}",
-        //         output.status,
-        //         StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-        //     );
-        // }
-
-        //把文件从单独的文件夹中提取出来
-        let current_dir = &self.archive_path;
-        let mut entries = fs::read_dir(&current_dir).map_err(|e| e.to_string())?;
-        while let Some(entry) = entries.next() {
+        std::fs::remove_file(path.join(&self.archive_name)).map_err(|e| e.to_string())?;
+        //从解压的文件夹中提取出文件并删除下载的压缩包等价于指令"cd *;mv ./* ../../"
+        for entry in path.read_dir().map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            if path.is_dir() {
-                std::env::set_current_dir(&path).map_err(|e| e.to_string())?;
-                move_files(&path, &current_dir).map_err(|e| e.to_string())?;
-            }
+            FileUtils::move_files(&path, &self.archive_path.parent().unwrap())
+                .map_err(|e| e.to_string())?;
+            //删除空的单独文件夹
+            std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
         }
-        // let cmd = "cd *;mv -f ./.[!.]* ../../;mv -f ./* ../../".to_string();
-        // let proc: std::process::Child = Command::new("bash")
-        //     .current_dir(path)
-        //     .arg("-c")
-        //     .arg(cmd)
-        //     .stderr(Stdio::piped())
-        //     .stdout(Stdio::inherit())
-        //     .spawn()
-        //     .map_err(|e| e.to_string())?;
-        // let output = proc.wait_with_output().map_err(|e| e.to_string())?;
-        // if !output.status.success() {
-        //     warn!(
-        //         "extract files from folder failed, status: {:?},  stderr: {:?}",
-        //         output.status,
-        //         StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-        //     );
-        // }
-        //删除空的单独文件夹
-        remove_dir_all(path.join(&self.filename)).map_err(|e| e.to_string())?;
-        // let mut cmd = "rm -d ".to_string();
-        // cmd += &self.filename;
-        // let proc: std::process::Child = Command::new("bash")
-        //     .current_dir(path)
-        //     .arg("-c")
-        //     .arg(cmd)
-        //     .stderr(Stdio::piped())
-        //     .stdout(Stdio::inherit())
-        //     .spawn()
-        //     .map_err(|e| e.to_string())?;
-        // let output = proc.wait_with_output().map_err(|e| e.to_string())?;
-        // if !output.status.success() {
-        //     warn!(
-        //         "remove empty folder failed, status: {:?},  stderr: {:?}",
-        //         output.status,
-        //         StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-        //     );
-        // }
-
         return Ok(());
     }
 }
@@ -642,32 +552,4 @@ pub enum ArchiveType {
     TarGz,
     Zip,
     Undefined,
-}
-
-fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let tempurl = Url::parse(url).unwrap();
-    let archive_name = tempurl.path_segments().unwrap().last().unwrap();
-    let client = Client::new();
-    let mut response = client.get(url).send()?;
-    let mut file = File::create(path.join(archive_name))?;
-    response.copy_to(&mut file)?;
-    Ok(())
-}
-
-fn move_files(src: &Path, dst: &Path) -> std::io::Result<()> {
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            move_files(&path, dst)?;
-        } else {
-            let filename = path.file_name().unwrap();
-            if filename.to_str().unwrap().starts_with(".") {
-                fs::rename(&path, dst.join(filename))?;
-            } else {
-                fs::rename(&path, dst.join(filename))?;
-            }
-        }
-    }
-    Ok(())
 }
