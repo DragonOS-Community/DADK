@@ -7,14 +7,14 @@ use std::{
     sync::RwLock,
 };
 
-use log::{error, info, warn, debug};
+use log::{debug, error, info, warn};
 
 use crate::{
     console::{clean::CleanLevel, Action},
     executor::cache::CacheDir,
     parser::task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
     scheduler::{SchedEntities, SchedEntity},
-    utils::stdio::StdioUtils,
+    utils::file::FileUtils,
 };
 
 use self::cache::CacheDirType;
@@ -107,7 +107,11 @@ impl Executor {
                 // 清理构建结果
                 let r = self.clean();
                 if let Err(e) = r {
-                    error!("Failed to clean task {}: {:?}", self.entity.task().name_version(), e);
+                    error!(
+                        "Failed to clean task {}: {:?}",
+                        self.entity.task().name_version(),
+                        e
+                    );
                 }
             }
             _ => {
@@ -165,36 +169,8 @@ impl Executor {
 
         // 拷贝构建结果到安装路径
         let build_dir: PathBuf = self.build_dir.path.clone();
-
-        let cmd = Command::new("cp")
-            .arg("-r")
-            .arg(build_dir.to_string_lossy().to_string() + "/.")
-            .arg(install_path)
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                ExecutorError::InstallError(format!(
-                    "Failed to install, error message: {}",
-                    e.to_string()
-                ))
-            })?;
-
-        let output = cmd.wait_with_output().map_err(|e| {
-            ExecutorError::InstallError(format!(
-                "Failed to install, error message: {}",
-                e.to_string()
-            ))
-        })?;
-
-        if !output.status.success() {
-            let err_msg = StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 10);
-            return Err(ExecutorError::InstallError(format!(
-                "Failed to install, error message: {}",
-                err_msg
-            )));
-        }
-
+        FileUtils::copy_dir_all(&build_dir, &install_path)
+            .map_err(|e| ExecutorError::InstallError(e))?;
         info!("Task {} installed.", self.entity.task().name_version());
 
         return Ok(());
@@ -292,7 +268,6 @@ impl Executor {
         if let Some(local_path) = self.entity.task().source_path() {
             return local_path;
         }
-
         return self.source_dir.as_ref().unwrap().path.clone();
     }
 
@@ -308,7 +283,15 @@ impl Executor {
                     self.action
                 ),
             },
-            _ => None,
+
+            TaskType::InstallFromPrebuilt(_) => match self.action {
+                Action::Build => self.entity.task().build.build_command.clone(),
+                Action::Clean(_) => self.entity.task().clean.clean_command.clone(),
+                _ => unimplemented!(
+                    "create_command: Action {:?} not supported yet.",
+                    self.action
+                ),
+            },
         };
 
         if raw_cmd.is_none() {
@@ -359,14 +342,13 @@ impl Executor {
 
     fn prepare_input(&self) -> Result<(), ExecutorError> {
         // 拉取源文件
-        if self.source_dir.is_none() {
-            return Ok(());
-        }
         let task = self.entity.task();
-        let source_dir = self.source_dir.as_ref().unwrap();
-
         match &task.task_type {
             TaskType::BuildFromSource(cs) => {
+                if self.source_dir.is_none() {
+                    return Ok(());
+                }
+                let source_dir = self.source_dir.as_ref().unwrap();
                 match cs {
                     CodeSource::Git(git) => {
                         git.prepare(source_dir)
@@ -375,15 +357,29 @@ impl Executor {
                     // 本地源文件，不需要拉取
                     CodeSource::Local(_) => return Ok(()),
                     // 在线压缩包，需要下载
-                    CodeSource::Archive(_) => todo!(),
+                    CodeSource::Archive(archive) => {
+                        archive
+                            .download_unzip(source_dir)
+                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                    }
                 }
             }
             TaskType::InstallFromPrebuilt(pb) => {
                 match pb {
                     // 本地源文件，不需要拉取
-                    PrebuiltSource::Local(_) => return Ok(()),
+                    PrebuiltSource::Local(local_source) => {
+                        let local_path = local_source.path();
+                        let target_path = &self.build_dir.path;
+                        FileUtils::copy_dir_all(&local_path, &target_path)
+                            .map_err(|e| ExecutorError::TaskFailed(e))?; // let mut cmd = "cp -r ".to_string();
+                        return Ok(());
+                    }
                     // 在线压缩包，需要下载
-                    PrebuiltSource::Archive(_) => todo!(),
+                    PrebuiltSource::Archive(archive) => {
+                        archive
+                            .download_unzip(&self.build_dir)
+                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                    }
                 }
             }
         }

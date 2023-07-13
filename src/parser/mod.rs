@@ -28,7 +28,7 @@ use std::{
     path::PathBuf,
 };
 
-use log::{error, info, debug};
+use log::{debug, error, info};
 
 use self::task::DADKTask;
 pub mod task;
