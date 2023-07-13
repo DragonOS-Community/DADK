@@ -142,7 +142,11 @@ impl DADKTask {
     }
 
     pub fn name_version(&self) -> String {
-        return format!("{}-{}", self.name.replace(" ", "_"), self.version);
+        let mut name_version = format!("{}-{}", self.name, self.version);
+        for (src, dst) in &NAME_VERSION_REPLACE_TABLE {
+            name_version = name_version.replace(src, dst);
+        }
+        return name_version;
     }
 
     pub fn name_version_env(&self) -> String {

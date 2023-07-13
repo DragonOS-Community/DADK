@@ -1,10 +1,10 @@
 use std::{
     collections::BTreeMap,
     env::Vars,
-    path::PathBuf,
+    path::{PathBuf, Path},
     process::{Command, Stdio},
     rc::Rc,
-    sync::RwLock,
+    sync::RwLock, fs,
 };
 
 use log::{debug, error, info, warn};
@@ -14,7 +14,6 @@ use crate::{
     executor::cache::CacheDir,
     parser::task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
     scheduler::{SchedEntities, SchedEntity},
-    utils::stdio::StdioUtils,
 };
 
 use self::cache::CacheDirType;
@@ -170,34 +169,35 @@ impl Executor {
         // 拷贝构建结果到安装路径
         let build_dir: PathBuf = self.build_dir.path.clone();
 
-        let cmd = Command::new("cp")
-            .arg("-r")
-            .arg(build_dir.to_string_lossy().to_string() + "/.")
-            .arg(install_path)
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                ExecutorError::InstallError(format!(
-                    "Failed to install, error message: {}",
-                    e.to_string()
-                ))
-            })?;
+        copy_dir_all(&build_dir, &install_path).map_err(|e|ExecutorError::InstallError(e))?;
+        // let cmd = Command::new("cp")
+        //     .arg("-r")
+        //     .arg(build_dir.to_string_lossy().to_string() + "/.")
+        //     .arg(install_path)
+        //     .stdout(Stdio::null())
+        //     .stderr(Stdio::piped())
+        //     .spawn()
+        //     .map_err(|e| {
+        //         ExecutorError::InstallError(format!(
+        //             "Failed to install, error message: {}",
+        //             e.to_string()
+        //         ))
+        //     })?;
 
-        let output = cmd.wait_with_output().map_err(|e| {
-            ExecutorError::InstallError(format!(
-                "Failed to install, error message: {}",
-                e.to_string()
-            ))
-        })?;
+        // let output = cmd.wait_with_output().map_err(|e| {
+        //     ExecutorError::InstallError(format!(
+        //         "Failed to install, error message: {}",
+        //         e.to_string()
+        //     ))
+        // })?;
 
-        if !output.status.success() {
-            let err_msg = StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 10);
-            return Err(ExecutorError::InstallError(format!(
-                "Failed to install, error message: {}",
-                err_msg
-            )));
-        }
+        // if !output.status.success() {
+        //     let err_msg = StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 10);
+        //     return Err(ExecutorError::InstallError(format!(
+        //         "Failed to install, error message: {}",
+        //         err_msg
+        //     )));
+        // }
 
         info!("Task {} installed.", self.entity.task().name_version());
 
@@ -387,7 +387,7 @@ impl Executor {
                     // 在线压缩包，需要下载
                     CodeSource::Archive(archive) => {
                         archive
-                            .install(source_dir)
+                            .download_unzip(source_dir)
                             .map_err(|e| ExecutorError::PrepareEnvError(e))?;
                     }
                 }
@@ -399,37 +399,37 @@ impl Executor {
                         let local_path = local_source.path();
                         let target_path = &self.build_dir.path;
 
-                        let mut cmd = "cp -r ".to_string();
-                        cmd += &(local_path.to_string_lossy().to_string() + "/* ");
-                        cmd += &(target_path.to_string_lossy().to_string());
-                        let proc: std::process::Child = Command::new("bash")
-                            .arg("-c")
-                            .arg(cmd)
-                            .stderr(Stdio::piped())
-                            .stdout(Stdio::inherit())
-                            .spawn()
-                            .map_err(|e| ExecutorError::PrepareEnvError(e.to_string()))?;
-                        let output = proc
-                            .wait_with_output()
-                            .map_err(|e| ExecutorError::PrepareEnvError(e.to_string()))?;
+                        copy_dir_all(&local_path, &target_path).map_err(|e|ExecutorError::TaskFailed(e))?;                       // let mut cmd = "cp -r ".to_string();
+                        // cmd += &(local_path.to_string_lossy().to_string() + "/* ");
+                        // cmd += &(target_path.to_string_lossy().to_string());
+                        // let proc: std::process::Child = Command::new("bash")
+                        //     .arg("-c")
+                        //     .arg(cmd)
+                        //     .stderr(Stdio::piped())
+                        //     .stdout(Stdio::inherit())
+                        //     .spawn()
+                        //     .map_err(|e| ExecutorError::PrepareEnvError(e.to_string()))?;
+                        // let output = proc
+                        //     .wait_with_output()
+                        //     .map_err(|e| ExecutorError::PrepareEnvError(e.to_string()))?;
 
-                        if !output.status.success() {
-                            return Err(ExecutorError::PrepareEnvError(format!(
-                                "clear temp folder failed, status: {:?},  stderr: {:?}",
-                                output.status,
-                                StdioUtils::tail_n_str(
-                                    StdioUtils::stderr_to_lines(&output.stderr),
-                                    5
-                                )
-                            )));
-                        }
+                        // if !output.status.success() {
+                        //     return Err(ExecutorError::PrepareEnvError(format!(
+                        //         "clear temp folder failed, status: {:?},  stderr: {:?}",
+                        //         output.status,
+                        //         StdioUtils::tail_n_str(
+                        //             StdioUtils::stderr_to_lines(&output.stderr),
+                        //             5
+                        //         )
+                        //     )));
+                        // }
 
                         return Ok(());
                     }
                     // 在线压缩包，需要下载
                     PrebuiltSource::Archive(archive) => {
                         archive
-                            .install(&self.build_dir)
+                            .download_unzip(&self.build_dir)
                             .map_err(|e| ExecutorError::PrepareEnvError(e))?;
                     }
                 }
@@ -585,4 +585,24 @@ pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> 
     // }
 
     return Ok(());
+}
+
+pub fn copy_dir_all(src: &Path, dst: &Path) ->Result<(),String> {
+    if src.is_dir() {
+        fs::create_dir_all(dst).map_err(|e|e.to_string())?;
+        for entry in fs::read_dir(src).map_err(|e|e.to_string())? {
+            let entry = entry.map_err(|e|e.to_string())?;
+            let path = entry.path();
+            let dst_path = dst.join(path.file_name().unwrap());
+            if path.is_dir() {
+                copy_dir_all(&path, &dst_path).map_err(|e|e.to_string())?;
+            } else {
+                fs::copy(&path, &dst_path).map_err(|e|e.to_string())?;
+            }
+        }
+    }
+    else {
+        return Err(format!("No such source directory:{:?}",src));
+    }
+    Ok(())
 }
