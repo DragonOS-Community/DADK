@@ -1,15 +1,21 @@
 use std::{fs::File, path::Path};
 
-use reqwest::{blocking::Client, Url};
+use reqwest::{blocking::ClientBuilder, Url};
 
 pub struct FileUtils;
 
 impl FileUtils {
     ///从指定url下载文件到指定路径
     pub fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        let tempurl = Url::parse(url).unwrap();
-        let file_name = tempurl.path_segments().unwrap().last().unwrap();
-        let client = Client::new();
+        let tempurl = Url::parse(url).expect("failed to parse the url");
+        let file_name = tempurl
+            .path_segments()
+            .unwrap()
+            .last()
+            .expect("failed to get the filename from the url");
+        let client = ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()?;
         let mut response = client.get(url).send()?;
         let mut file = File::create(path.join(file_name))?;
         response.copy_to(&mut file)?;
