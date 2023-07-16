@@ -10,7 +10,7 @@ impl FileUtils {
         let tempurl = Url::parse(url).expect("failed to parse the url");
         let file_name = tempurl
             .path_segments()
-            .unwrap()
+            .expect("connot be base url")
             .last()
             .expect("failed to get the filename from the url");
         let client = ClientBuilder::new()
