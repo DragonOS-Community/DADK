@@ -473,13 +473,9 @@ impl ArchiveFile {
         //根据压缩文件的类型生成cmd指令
         match &self.archive_type {
             ArchiveType::TarGz => {
-                let mut cmd = "".to_string();
-                cmd += "tar -xzf ";
-                cmd += &self.archive_name;
-                let proc: std::process::Child = Command::new("bash")
-                    .current_dir(path)
-                    .arg("-c")
-                    .arg(cmd)
+                let mut cmd = Command::new("tar -xzf");
+                cmd.arg(&self.archive_name);
+                let proc: std::process::Child = cmd
                     .stderr(Stdio::piped())
                     .stdout(Stdio::inherit())
                     .spawn()
