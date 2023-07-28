@@ -1,13 +1,16 @@
+use log::info;
+use regex::Regex;
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use std::os::unix::fs::PermissionsExt;
 use std::{
+    fs::File,
     path::PathBuf,
     process::{Command, Stdio},
 };
+use zip::ZipArchive;
 
-use log::info;
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
-
-use crate::utils::stdio::StdioUtils;
+use crate::utils::{file::FileUtils, stdio::StdioUtils};
 
 use super::cache::CacheDir;
 
@@ -32,7 +35,6 @@ impl GitSource {
             revision,
         }
     }
-
     /// # 验证参数合法性
     ///
     /// 仅进行形式校验，不会检查Git仓库是否存在，以及分支是否存在、是否有权限访问等
@@ -218,7 +220,6 @@ impl GitSource {
         }
         return Ok(());
     }
-
     /// # 把浅克隆的仓库变成深克隆
     fn unshallow(&self, target_dir: &CacheDir) -> Result<(), String> {
         let mut cmd = Command::new("git");
@@ -356,7 +357,6 @@ impl ArchiveSource {
     pub fn new(url: String) -> Self {
         Self { url }
     }
-
     pub fn validate(&self) -> Result<(), String> {
         if self.url.is_empty() {
             return Err("url is empty".to_string());
@@ -376,4 +376,176 @@ impl ArchiveSource {
     pub fn trim(&mut self) {
         self.url = self.url.trim().to_string();
     }
+
+    /// @brief 下载压缩包并把其中的文件提取至target_dir目录下
+    ///
+    ///从URL中下载压缩包到临时文件夹 target_dir/DRAGONOS_ARCHIVE_TEMP 后
+    ///原地解压，提取文件后删除下载的压缩包。如果 target_dir 非空，就直接使用
+    ///其中内容，不进行重复下载和覆盖
+    ///
+    /// @param target_dir 文件缓存目录
+    ///
+    /// @return 根据结果返回OK或Err
+    pub fn download_unzip(&self, target_dir: &CacheDir) -> Result<(), String> {
+        let url = Url::parse(&self.url).unwrap();
+        let archive_name = url.path_segments().unwrap().last().unwrap();
+        let path = &(target_dir.path.join("DRAGONOS_ARCHIVE_TEMP"));
+        //如果source目录没有临时文件夹，且不为空，说明之前成功执行过一次，那么就直接使用之前的缓存
+        if !path.exists()
+            && !target_dir.is_empty().map_err(|e| {
+                format!(
+                    "Failed to check if target dir is empty: {}, message: {e:?}",
+                    target_dir.path.display()
+                )
+            })?
+        {
+            //如果source文件夹非空，就直接使用，不再重复下载压缩文件，这里可以考虑加入交互
+            info!("Source files already exist. Using previous source file cache. You should clean {:?} before re-download the archive ",target_dir);
+            return Ok(());
+        }
+
+        if path.exists() {
+            std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+        }
+        //创建临时目录
+        std::fs::create_dir(path).map_err(|e| e.to_string())?;
+        info!("downloading {:?}", archive_name);
+        FileUtils::download_file(&self.url, path).map_err(|e| e.to_string())?;
+        //下载成功，开始尝试解压
+        info!("download {:?} finished, start unzip", archive_name);
+        let archive_file = ArchiveFile::new(&path.join(archive_name));
+        archive_file.unzip()?;
+        //删除创建的临时文件夹
+        std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+}
+
+pub struct ArchiveFile {
+    archive_path: PathBuf,
+    archive_name: String,
+    archive_type: ArchiveType,
+}
+
+impl ArchiveFile {
+    pub fn new(archive_path: &PathBuf) -> Self {
+        //匹配压缩文件类型
+        let archive_name = archive_path.file_name().unwrap().to_str().unwrap();
+        for (regex, archivetype) in [
+            (Regex::new(r"^(.+)\.tar\.gz$").unwrap(), ArchiveType::TarGz),
+            (Regex::new(r"^(.+)\.zip$").unwrap(), ArchiveType::Zip),
+        ] {
+            if regex.is_match(archive_name) {
+                return Self {
+                    archive_path: archive_path.parent().unwrap().to_path_buf(),
+                    archive_name: archive_name.to_string(),
+                    archive_type: archivetype,
+                };
+            }
+        }
+        Self {
+            archive_path: archive_path.parent().unwrap().to_path_buf(),
+            archive_name: archive_name.to_string(),
+            archive_type: ArchiveType::Undefined,
+        }
+    }
+
+    /// @brief 对self.archive_path路径下名为self.archive_name的压缩文件(tar.gz或zip)进行解压缩
+    ///
+    /// 在此函数中进行路径和文件名有效性的判断，如果有效的话就开始解压缩，根据ArchiveType枚举类型来
+    /// 生成不同的命令来对压缩文件进行解压缩，暂时只支持tar.gz和zip格式，并且都是通过调用bash来解压缩
+    /// 没有引入第三方rust库
+    ///
+    ///
+    /// @return 根据结果返回OK或Err
+
+    pub fn unzip(&self) -> Result<(), String> {
+        let path = &self.archive_path;
+        if !path.is_dir() {
+            return Err(format!("Archive directory {:?} is wrong", path));
+        }
+        if !path.join(&self.archive_name).is_file() {
+            return Err(format!(
+                " {:?} is not a file",
+                path.join(&self.archive_name)
+            ));
+        }
+        //根据压缩文件的类型生成cmd指令
+        match &self.archive_type {
+            ArchiveType::TarGz => {
+                let mut cmd = Command::new("tar -xzf");
+                cmd.arg(&self.archive_name);
+                let proc: std::process::Child = cmd
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::inherit())
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+                let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+                if !output.status.success() {
+                    return Err(format!(
+                        "unzip failed, status: {:?},  stderr: {:?}",
+                        output.status,
+                        StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+                    ));
+                }
+            }
+
+            ArchiveType::Zip => {
+                let file = File::open(&self.archive_path.join(&self.archive_name))
+                    .map_err(|e| e.to_string())?;
+                let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
+                for i in 0..archive.len() {
+                    let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+                    let outpath = match file.enclosed_name() {
+                        Some(path) => self.archive_path.join(path),
+                        None => continue,
+                    };
+                    if (*file.name()).ends_with('/') {
+                        std::fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
+                    } else {
+                        if let Some(p) = outpath.parent() {
+                            if !p.exists() {
+                                std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                            }
+                        }
+                        let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
+                        std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+                    }
+                    //设置解压后权限，在Linux中Unzip会丢失权限
+                    #[cfg(unix)]
+                    {
+                        if let Some(mode) = file.unix_mode() {
+                            std::fs::set_permissions(
+                                &outpath,
+                                std::fs::Permissions::from_mode(mode),
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err("unsupported archive type".to_string());
+            }
+        }
+        //删除下载的压缩包
+        info!("unzip successfully, removing archive ");
+        std::fs::remove_file(path.join(&self.archive_name)).map_err(|e| e.to_string())?;
+        //从解压的文件夹中提取出文件并删除下载的压缩包等价于指令"cd *;mv ./* ../../"
+        for entry in path.read_dir().map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            FileUtils::move_files(&path, &self.archive_path.parent().unwrap())
+                .map_err(|e| e.to_string())?;
+            //删除空的单独文件夹
+            std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    }
+}
+
+pub enum ArchiveType {
+    TarGz,
+    Zip,
+    Undefined,
 }
