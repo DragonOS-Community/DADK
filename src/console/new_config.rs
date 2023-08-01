@@ -104,7 +104,10 @@ impl NewConfigCommand {
 
         let dep: Vec<Dependency> = DependencyInput::new().input()?;
         debug!("dep: {:?}", dep);
-        let build_config: BuildConfig = BuildConfigInput::new().input()?;
+        let build_config: BuildConfig = match &task_type {
+            TaskType::InstallFromPrebuilt(_) => BuildConfig::new(Option::Some("".to_string())),
+            TaskType::BuildFromSource(_) => BuildConfigInput::new().input()?,
+        };
         debug!("build_config: {:?}", build_config);
         let install_config: InstallConfig = InstallConfigInput::new().input()?;
         debug!("install_config: {:?}", install_config);
