@@ -226,8 +226,7 @@ impl GitSource {
         cmd.current_dir(&target_dir.path);
         cmd.arg("fetch").arg("--unshallow");
 
-        // 安静模式
-        cmd.arg("-f").arg("-q");
+        cmd.arg("-f");
 
         // 创建子进程，执行命令
         let proc: std::process::Child = cmd
@@ -429,6 +428,7 @@ pub struct ArchiveFile {
 
 impl ArchiveFile {
     pub fn new(archive_path: &PathBuf) -> Self {
+        info!("archive_path: {:?}", archive_path);
         //匹配压缩文件类型
         let archive_name = archive_path.file_name().unwrap().to_str().unwrap();
         for (regex, archivetype) in [
@@ -473,9 +473,10 @@ impl ArchiveFile {
         //根据压缩文件的类型生成cmd指令
         match &self.archive_type {
             ArchiveType::TarGz => {
-                let mut cmd = Command::new("tar -xzf");
-                cmd.arg(&self.archive_name);
+                let mut cmd = Command::new("tar");
+                cmd.arg("-xzf").arg(&self.archive_name);
                 let proc: std::process::Child = cmd
+                    .current_dir(path)
                     .stderr(Stdio::piped())
                     .stdout(Stdio::inherit())
                     .spawn()
