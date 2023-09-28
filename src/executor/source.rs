@@ -222,6 +222,10 @@ impl GitSource {
     }
     /// # 把浅克隆的仓库变成深克隆
     fn unshallow(&self, target_dir: &CacheDir) -> Result<(), String> {
+        if self.is_shallow(target_dir)? == false {
+            return Ok(());
+        }
+
         let mut cmd = Command::new("git");
         cmd.current_dir(&target_dir.path);
         cmd.arg("fetch").arg("--unshallow");
@@ -243,6 +247,30 @@ impl GitSource {
             ));
         }
         return Ok(());
+    }
+
+    /// 判断当前仓库是否是浅克隆
+    fn is_shallow(&self, target_dir: &CacheDir) -> Result<bool, String> {
+        let mut cmd = Command::new("git");
+        cmd.current_dir(&target_dir.path);
+        cmd.arg("rev-parse").arg("--is-shallow-repository");
+
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "Failed to check if shallow {}, message: {}",
+                target_dir.path.display(),
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+
+        let is_shallow = String::from_utf8_lossy(&output.stdout).trim() == "true";
+        return Ok(is_shallow);
     }
 
     fn fetch_all(&self, target_dir: &CacheDir) -> Result<(), String> {
