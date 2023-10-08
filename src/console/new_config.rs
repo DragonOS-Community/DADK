@@ -98,7 +98,7 @@ impl NewConfigCommand {
             "name: {}, version: {}, description: {}",
             name, version, description
         );
-
+        let rust_target = self.input_rust_target(&name, &version)?;
         let task_type: TaskType = TaskTypeInput::new().input()?;
         debug!("task_type: {:?}", task_type);
 
@@ -121,6 +121,7 @@ impl NewConfigCommand {
             name,
             version,
             description,
+            rust_target,
             task_type,
             dep,
             build_config,
@@ -164,6 +165,29 @@ impl NewConfigCommand {
         .input()?;
 
         return Ok(description);
+    }
+
+    // 输入编译target
+    fn input_rust_target(&self, name: &str, version: &str) -> Result<Option<String>, ConsoleError> {
+        if let Some(dir) = &self.config_dir {
+            let mut path = PathBuf::from(dir);
+            let file_name = format!("{}-{}.dadk", name, version);
+            path.push(file_name);
+            let config_file = PathBuf::from(path);
+            let content =
+                std::fs::read_to_string(config_file).map_err(|e| ConsoleError::IOError(e))?;
+            if content.contains("\"rust_target\":") {
+                //如果json文件里包含rust_targe字段，才读取
+                let rust_target = Input::new(
+                    Some("Please input the [rust_target] of the task:".to_string()),
+                    None,
+                )
+                .input()?;
+                return Ok(Some(rust_target));
+            }
+        }
+
+        return Ok(None);
     }
 }
 

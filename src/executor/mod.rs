@@ -12,6 +12,7 @@ use log::{debug, error, info, warn};
 use crate::{
     console::{clean::CleanLevel, Action},
     executor::cache::CacheDir,
+    executor::target::Target,
     parser::task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
     scheduler::{SchedEntities, SchedEntity},
     utils::file::FileUtils,
@@ -21,10 +22,13 @@ use self::cache::CacheDirType;
 
 pub mod cache;
 pub mod source;
+pub mod target;
 
 lazy_static! {
     // 全局环境变量的列表
     pub static ref ENV_LIST: RwLock<EnvMap> = RwLock::new(EnvMap::new());
+    // 全局编译target文件管理
+    pub static ref TARGET_LIST: RwLock<Target> = RwLock::new(Target::new());
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +94,24 @@ impl Executor {
     /// 4. 执行构建
     pub fn execute(&mut self) -> Result<(), ExecutorError> {
         info!("Execute task: {}", self.entity.task().name_version());
+
+        if let Some(rust_target) = self.entity.task().rust_target.clone() {
+            let name = self.entity.task().name.clone();
+            // 当前DADK文件路径，用于生成哈希值，避免同名文件生成相同的哈希值
+            let file_path = self.entity.file_path();
+            // 将target文件拷贝至/tmp中
+            TARGET_LIST.write().unwrap().mvtotmp(
+                &name,
+                &rust_target,
+                file_path,
+                &self.dragonos_sysroot,
+            )?;
+            // 设置DADK_RUST_TARGET_FILE环境变量
+            TARGET_LIST
+                .write()
+                .unwrap()
+                .set_env(&mut self.local_envs, &name);
+        }
 
         // 准备本地环境变量
         self.prepare_local_env()?;
@@ -259,7 +281,7 @@ impl Executor {
             self.entity.task().name_version(),
             self.src_work_dir().display()
         );
-
+        TARGET_LIST.write().unwrap().clean_tmpdadk()?;
         return cache_dir.unwrap().remove_self_recursive();
     }
 
