@@ -96,21 +96,19 @@ impl Executor {
         info!("Execute task: {}", self.entity.task().name_version());
 
         if let Some(rust_target) = self.entity.task().rust_target.clone() {
-            let name = self.entity.task().name.clone();
             // 当前DADK文件路径，用于生成哈希值，避免同名文件生成相同的哈希值
-            let file_path = self.entity.file_path();
+            let file_str = self.entity.file_path().as_os_str().to_str().unwrap();
             // 将target文件拷贝至/tmp中
             TARGET_LIST.write().unwrap().mvtotmp(
-                &name,
                 &rust_target,
-                file_path,
+                file_str,
                 &self.dragonos_sysroot,
             )?;
             // 设置DADK_RUST_TARGET_FILE环境变量
             TARGET_LIST
                 .write()
                 .unwrap()
-                .set_env(&mut self.local_envs, &name);
+                .set_env(&mut self.local_envs, file_str);
         }
 
         // 准备本地环境变量
@@ -266,6 +264,7 @@ impl Executor {
             self.entity.task().name_version(),
             self.build_dir.path
         );
+        TARGET_LIST.write().unwrap().clean_tmpdadk()?;
         return self.build_dir.remove_self_recursive();
     }
 
@@ -281,7 +280,6 @@ impl Executor {
             self.entity.task().name_version(),
             self.src_work_dir().display()
         );
-        TARGET_LIST.write().unwrap().clean_tmpdadk()?;
         return cache_dir.unwrap().remove_self_recursive();
     }
 

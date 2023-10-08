@@ -12,28 +12,25 @@ use crate::executor::ExecutorError;
 
 #[derive(Debug, Clone)]
 pub struct Target {
-    /// DADK任务名和其对应的存放在临时文件夹中的target文件路径
-    pub name2tmp: BTreeMap<String, PathBuf>,
-    /// DADK任务名和其对应的源target文件路径
-    pub name2source: BTreeMap<String, PathBuf>,
+    /// DADK文件和其对应的存放在临时文件夹中的target文件路径
+    pub dadk2tmp: BTreeMap<String, PathBuf>,
+    /// DADK文件和其对应的源target文件路径
+    pub dadk2source: BTreeMap<String, PathBuf>,
 }
 
 impl Target {
     pub fn new() -> Target {
-        let name2tmp: BTreeMap<String, PathBuf> = BTreeMap::new();
-        let name2source: BTreeMap<String, PathBuf> = BTreeMap::new();
-        return Target {
-            name2tmp,
-            name2source,
-        };
+        Target{
+            dadk2tmp: BTreeMap::new(),
+            dadk2source: BTreeMap::new(),
+        }
     }
 
     // 将rust_target文件拷贝到/tmp中临时存放
     pub fn mvtotmp(
         &mut self,
-        name: &str,
         rust_target: &str,
-        file_path: &PathBuf,
+        file_str: &str,
         dragonos_dir: &PathBuf,
     ) -> Result<(), ExecutorError> {
         let dragonos_path = dragonos_dir
@@ -43,10 +40,10 @@ impl Target {
             .to_string()
             .replace("/bin/sysroot", "");
         let path = self.target_path(&rust_target, &dragonos_path)?;
-        let tmp_dadk = self.get_hash(file_path);
-        self.name2source.insert(name.to_string(), path.clone());
-        self.name2tmp
-            .insert(name.to_string(), PathBuf::from(&tmp_dadk));
+        let tmp_dadk = self.get_hash(file_str);
+        self.dadk2source.insert(file_str.to_string(), path.clone());
+        self.dadk2tmp
+            .insert(file_str.to_string(), PathBuf::from(&tmp_dadk));
         self.create_and_copy(&path, &tmp_dadk)?;
 
         return Ok(());
@@ -75,9 +72,8 @@ impl Target {
     }
 
     // 通过文件路径生成相应的哈希值
-    pub fn get_hash(&self, file_path: &PathBuf) -> String {
+    pub fn get_hash(&self, file_str: &str) -> String {
         let mut hasher = DefaultHasher::new();
-        let file_str = file_path.as_os_str().to_str().unwrap().to_string();
         file_str.hash(&mut hasher);
         let hash_string = format!("{:x}", hasher.finish());
         let first_six = &hash_string[0..6];
@@ -107,10 +103,10 @@ impl Target {
     }
 
     // 设置DADK_RUST_TARGET_FILE环境变量
-    pub fn set_env(&self, local_env: &mut EnvMap, name: &str) {
+    pub fn set_env(&self, local_env: &mut EnvMap, file_str: &str) {
         let source = self
-            .name2source
-            .get(name)
+            .dadk2source
+            .get(file_str)
             .unwrap()
             .as_os_str()
             .to_str()
@@ -121,7 +117,7 @@ impl Target {
 
     // 清理临时文件夹下的各target文件
     pub fn clean_tmpdadk(&self) -> Result<(), ExecutorError> {
-        for (_, path) in self.name2tmp.iter() {
+        for (_, path) in self.dadk2tmp.iter() {
             if path.exists() {
                 std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e))?;
             }
