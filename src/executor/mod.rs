@@ -12,13 +12,12 @@ use log::{debug, error, info, warn};
 use crate::{
     console::{clean::CleanLevel, Action},
     executor::cache::CacheDir,
-    executor::target::Target,
     parser::task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
     scheduler::{SchedEntities, SchedEntity},
     utils::file::FileUtils,
 };
 
-use self::cache::CacheDirType;
+use self::{cache::CacheDirType, target::TargetManager};
 
 pub mod cache;
 pub mod source;
@@ -27,9 +26,9 @@ pub mod target;
 lazy_static! {
     // 全局环境变量的列表
     pub static ref ENV_LIST: RwLock<EnvMap> = RwLock::new(EnvMap::new());
-    // 全局编译target文件管理
-    pub static ref TARGET_LIST: RwLock<Target> = RwLock::new(Target::new());
 }
+
+pub const TARGET_BINARY: &'static [u8] = include_bytes!("target.json");
 
 #[derive(Debug, Clone)]
 pub struct Executor {
@@ -95,22 +94,6 @@ impl Executor {
     pub fn execute(&mut self) -> Result<(), ExecutorError> {
         info!("Execute task: {}", self.entity.task().name_version());
 
-        if let Some(rust_target) = self.entity.task().rust_target.clone() {
-            // 当前DADK文件路径，用于生成哈希值，避免同名文件生成相同的哈希值
-            let file_str = self.entity.file_path().as_os_str().to_str().unwrap();
-            // 将target文件拷贝至/tmp中
-            TARGET_LIST.write().unwrap().mvtotmp(
-                &rust_target,
-                file_str,
-                &self.dragonos_sysroot,
-            )?;
-            // 设置DADK_RUST_TARGET_FILE环境变量
-            TARGET_LIST
-                .write()
-                .unwrap()
-                .set_env(&mut self.local_envs, file_str);
-        }
-
         // 准备本地环境变量
         self.prepare_local_env()?;
 
@@ -144,6 +127,8 @@ impl Executor {
 
     /// # 执行build操作
     fn build(&mut self) -> Result<(), ExecutorError> {
+        self.mv_target_to_tmp()?;
+
         // 确认源文件就绪
         self.prepare_input()?;
 
@@ -264,7 +249,9 @@ impl Executor {
             self.entity.task().name_version(),
             self.build_dir.path
         );
-        TARGET_LIST.write().unwrap().clean_tmpdadk()?;
+        if let Some(target) = self.entity.target() {
+            target.clean_tmpdadk()?;
+        }
         return self.build_dir.remove_self_recursive();
     }
 
@@ -346,6 +333,8 @@ impl Executor {
     /// # 准备工作线程本地环境变量
     fn prepare_local_env(&mut self) -> Result<(), ExecutorError> {
         // 设置本地环境变量
+        self.set_dadk_rust_target_file()?;
+
         let task_envs: Option<&Vec<TaskEnv>> = self.entity.task().envs.as_ref();
         if task_envs.is_none() {
             return Ok(());
@@ -456,6 +445,41 @@ impl Executor {
             error!("{errmsg}");
             return Err(ExecutorError::TaskFailed(errmsg));
         }
+    }
+
+    pub fn mv_target_to_tmp(&mut self) -> Result<(), ExecutorError> {
+        if let Some(rust_target) = self.entity.task().rust_target.clone() {
+            // 创建临时target文件
+            let tmp_target_path = self.entity.target().as_ref().unwrap().tmp_target_path();
+            TargetManager::create_tmp_target(tmp_target_path)?;
+
+            // 将target文件拷贝至 /tmp 下对应的dadk文件的临时target文件中
+            self.entity
+                .target()
+                .as_ref()
+                .unwrap()
+                .mv_to_tmp(&rust_target)?;
+        }
+        return Ok(());
+    }
+
+    pub fn set_dadk_rust_target_file(&mut self) -> Result<(), ExecutorError> {
+        if let Some(_) = self.entity.task().rust_target.clone() {
+            // 如果有dadk任务有rust_target字段，需要设置DADK_RUST_TARGET_FILE环境变量，值为临时target文件路径
+            let path: PathBuf = self
+                .entity
+                .target()
+                .as_ref()
+                .unwrap()
+                .tmp_target_path()
+                .clone();
+            self.entity
+                .target()
+                .as_ref()
+                .unwrap()
+                .set_env(&mut self.local_envs, &path);
+        }
+        return Ok(());
     }
 }
 

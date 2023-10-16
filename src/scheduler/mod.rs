@@ -9,7 +9,11 @@ use std::{
 
 use log::{error, info};
 
-use crate::{console::Action, executor::Executor, parser::task::DADKTask};
+use crate::{
+    console::Action,
+    executor::{target::TargetManager, Executor},
+    parser::task::DADKTask,
+};
 
 /// # 调度实体
 #[derive(Debug, Clone)]
@@ -19,6 +23,8 @@ pub struct SchedEntity {
     file_path: PathBuf,
     /// 任务
     task: DADKTask,
+    /// target管理
+    target: Option<TargetManager>,
 }
 
 impl PartialEq for SchedEntity {
@@ -46,6 +52,16 @@ impl SchedEntity {
     #[allow(dead_code)]
     pub fn task_mut(&mut self) -> &mut DADKTask {
         &mut self.task
+    }
+
+    #[allow(dead_code)]
+    pub fn target(&self) -> &Option<TargetManager> {
+        &self.target
+    }
+
+    #[allow(dead_code)]
+    pub fn target_mut(&mut self) -> &mut Option<TargetManager> {
+        &mut self.target
     }
 }
 
@@ -252,10 +268,12 @@ impl Scheduler {
     /// 添加任务到调度器中，如果任务已经存在，则返回错误
     pub fn add_task(&mut self, path: PathBuf, task: DADKTask) -> Result<(), SchedulerError> {
         let id: i32 = self.generate_task_id();
+        let target = self.generate_task_target(&path, &task.rust_target)?;
         let entity = Rc::new(SchedEntity {
             id,
             task,
             file_path: path.clone(),
+            target,
         });
         let name_version = (entity.task.name.clone(), entity.task.version.clone());
 
@@ -281,6 +299,40 @@ impl Scheduler {
     fn generate_task_id(&self) -> i32 {
         static TASK_ID: AtomicI32 = AtomicI32::new(0);
         return TASK_ID.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn generate_task_target(
+        &self,
+        path: &PathBuf,
+        rust_target: &Option<String>,
+    ) -> Result<Option<TargetManager>, SchedulerError> {
+        if let Some(rust_target) = rust_target {
+            // 如果rust_target字段不为none，说明需要target管理
+            // 获取dadk任务路径，用于生成临时dadk文件名
+            let file_str = path.as_path().to_str().unwrap();
+            let tmp_dadk_path = TargetManager::tmp_dadk(file_str);
+            let tmp_dadk_str = tmp_dadk_path.as_path().to_str().unwrap();
+
+            if TargetManager::is_user_target(rust_target) {
+                // 如果target文件是用户自己的
+                if let Ok(target_path) = TargetManager::user_target_path(rust_target) {
+                    let target_path_str = target_path.as_path().to_str().unwrap();
+                    let index = target_path_str.rfind('/').unwrap();
+                    let target_name = target_path_str[index + 1..].to_string();
+                    let tmp_target = PathBuf::from(format!("{}{}", tmp_dadk_str, target_name));
+                    return Ok(Some(TargetManager::new(tmp_target)));
+                } else {
+                    return Err(SchedulerError::TaskError(
+                        "The path of target file is invalid.".to_string(),
+                    ));
+                }
+            } else {
+                // 如果target文件是内置的
+                let tmp_target = PathBuf::from(format!("{}{}", tmp_dadk_str, "target.json"));
+                return Ok(Some(TargetManager::new(tmp_target)));
+            }
+        }
+        return Ok(None);
     }
 
     /// # 执行调度器中的所有任务

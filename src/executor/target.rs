@@ -4,124 +4,191 @@ use ::std::{
     hash::{Hash, Hasher},
     path::PathBuf,
 };
-use std::collections::BTreeMap;
+use log::error;
+use std::io::Write;
 
 use crate::executor::{EnvMap, EnvVar};
 
 use crate::executor::ExecutorError;
 
+use super::TARGET_BINARY;
+
+/// TargetManager用于管理生成的临时target文件
 #[derive(Debug, Clone)]
-pub struct Target {
-    /// DADK文件和其对应的存放在临时文件夹中的target文件路径
-    pub dadk2tmp: BTreeMap<String, PathBuf>,
-    /// DADK文件和其对应的源target文件路径
-    pub dadk2source: BTreeMap<String, PathBuf>,
+pub struct TargetManager {
+    /// 临时target文件路径
+    tmp_target_path: PathBuf,
 }
 
-impl Target {
-    pub fn new() -> Target {
-        Target{
-            dadk2tmp: BTreeMap::new(),
-            dadk2source: BTreeMap::new(),
+impl TargetManager {
+    /// 创建target管理器
+    ///
+    /// ## 参数
+    ///
+    /// - `path` : 临时target文件路径
+    ///
+    /// ## 返回值
+    ///
+    /// target管理器
+    pub fn new(path: PathBuf) -> TargetManager {
+        TargetManager {
+            tmp_target_path: path,
         }
     }
 
-    // 将rust_target文件拷贝到/tmp中临时存放
-    pub fn mvtotmp(
-        &mut self,
-        rust_target: &str,
-        file_str: &str,
-        dragonos_dir: &PathBuf,
-    ) -> Result<(), ExecutorError> {
-        let dragonos_path = dragonos_dir
-            .as_os_str()
-            .to_str()
-            .unwrap()
-            .to_string()
-            .replace("/bin/sysroot", "");
-        let path = self.target_path(&rust_target, &dragonos_path)?;
-        let tmp_dadk = self.get_hash(file_str);
-        self.dadk2source.insert(file_str.to_string(), path.clone());
-        self.dadk2tmp
-            .insert(file_str.to_string(), PathBuf::from(&tmp_dadk));
-        self.create_and_copy(&path, &tmp_dadk)?;
-
+    /// 将用户的target文件或用户使用的内置target文件拷贝到临时target文件
+    ///
+    /// ## 参数
+    ///
+    /// - `rust_target` : dadk任务的rust_target字段值
+    ///
+    /// ## 返回值
+    ///
+    /// Ok(()) 拷贝成功
+    /// Err(ExecutorError) 拷贝失败
+    pub fn mv_to_tmp(&self, rust_target: &str) -> Result<(), ExecutorError> {
+        if Self::is_user_target(rust_target) {
+            // 如果是用户的target文件，则从源target文件路径from拷贝
+            let from = Self::user_target_path(&rust_target).unwrap();
+            self.copy_to_tmp(&from)?;
+        } else {
+            // 如果使用的是内置target文件，则将默认的target文件写入临时target文件中
+            self.write_to_tmp()?;
+        }
         return Ok(());
     }
 
-    // 获取rust_target文件的准确路径
-    pub fn target_path(
-        &self,
-        rust_target: &str,
-        dragonos_path: &str,
-    ) -> Result<PathBuf, ExecutorError> {
-        //如果是个路径，说明是用户自己的编译target文件，判断文件是否有效
-        if rust_target.contains('/') | rust_target.contains('\\') {
-            let path = PathBuf::from(rust_target);
-            if path.exists() {
-                return Ok(path);
-            } else {
-                return Err(ExecutorError::PrepareEnvError(
-                    "Can not find the rust_target file.".to_string(),
-                ));
-            }
+    pub fn copy_to_tmp(&self, from: &PathBuf) -> Result<(), ExecutorError> {
+        if let Err(e) = fs::copy(from, &self.tmp_target_path) {
+            return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
         }
-
-        let default_target = format!("{}{}", dragonos_path, "/user/dadk/target.json");
-        return Ok(PathBuf::from(default_target));
+        return Ok(());
     }
 
-    // 通过文件路径生成相应的哈希值
-    pub fn get_hash(&self, file_str: &str) -> String {
+    pub fn write_to_tmp(&self) -> Result<(), ExecutorError> {
+        match fs::File::create(&self.tmp_target_path) {
+            Ok(mut file) => {
+                // 将target文件的二进制变量写入临时target文件中
+                if let Err(e) = file.write_all(&TARGET_BINARY) {
+                    return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
+                }
+            }
+            Err(e) => {
+                return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
+            }
+        }
+        return Ok(());
+    }
+
+    /// 获取用户的target文件路径
+    ///
+    /// ## 参数
+    ///
+    /// - `rust_target` : dadk任务的rust_target字段值
+    ///
+    /// ## 返回值
+    ///
+    /// Ok(PathBuf) 用户target文件路径
+    /// Err(ExecutorError) 用户target文件路径无效
+    pub fn user_target_path(rust_target: &str) -> Result<PathBuf, ExecutorError> {
+        // 如果是个路径，说明是用户自己的编译target文件，就判断文件是否有效
+        let path = PathBuf::from(rust_target);
+        if path.exists() {
+            return Ok(path);
+        } else {
+            let path = path.as_path().to_str().unwrap();
+            let errmsg = format!("Can not find the rust_target file: {}", path);
+            error!("{errmsg}");
+            return Err(ExecutorError::PrepareEnvError(errmsg));
+        }
+    }
+
+    /// 通过dadk任务的路径生成相应的临时dadk目录路径
+    ///
+    /// ## 参数
+    ///
+    /// - `file_str` : dadk任务文件路径的字符串值
+    ///
+    /// ## 返回值
+    ///
+    /// 临时dadk目录路径
+    pub fn tmp_dadk(file_str: &str) -> PathBuf {
         let mut hasher = DefaultHasher::new();
         file_str.hash(&mut hasher);
         let hash_string = format!("{:x}", hasher.finish());
         let first_six = &hash_string[0..6];
-        //在/tmp文件夹下，创建当前DADK任务文件夹用于临时存放target
+        // 在/tmp文件夹下，创建当前DADK任务文件夹用于临时存放target
         let tmp_dadk = format!("/tmp/dadk{}/", first_six);
-        return tmp_dadk;
+        return PathBuf::from(tmp_dadk);
     }
 
-    // 在/tmp目录下创建临时文件夹存放各dadk对应的target文件
-    pub fn create_and_copy(&self, from: &PathBuf, to: &str) -> Result<(), ExecutorError> {
-        match fs::metadata(&to) {
-            Ok(_) => (),
-            Err(_) => {
-                if let Err(e) = fs::create_dir(&to) {
-                    return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
-                }
-                let tmp_target = format!("{}{}", to, "target.json");
-                if let Err(e) = fs::File::create(PathBuf::from(&tmp_target)) {
-                    return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
-                }
-                if let Err(e) = fs::copy(from, tmp_target) {
-                    return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
-                }
-            }
+    /// 创建临时target文件
+    ///
+    /// ## 参数
+    ///
+    /// - `tmp_target_path` : 临时target文件路径
+    ///
+    /// ## 返回值
+    ///
+    /// Ok(()) 创建成功
+    /// Err(ExecutorError) 创建失败
+    pub fn create_tmp_target(tmp_target_path: &PathBuf) -> Result<(), ExecutorError> {
+        // 先创建用于存放临时target文件的临时dadk目录
+        let dir = Self::dir(&tmp_target_path);
+        if let Err(e) = fs::create_dir(dir) {
+            return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
+        }
+        if let Err(e) = fs::File::create(&tmp_target_path) {
+            return Err(ExecutorError::PrepareEnvError(format!("{}", e)));
         }
         return Ok(());
     }
 
-    // 设置DADK_RUST_TARGET_FILE环境变量
-    pub fn set_env(&self, local_env: &mut EnvMap, file_str: &str) {
-        let source = self
-            .dadk2source
-            .get(file_str)
-            .unwrap()
-            .as_os_str()
-            .to_str()
-            .unwrap()
-            .to_string();
-        local_env.add(EnvVar::new("DADK_RUST_TARGET_FILE".to_string(), source));
+    /// 设置DADK_RUST_TARGET_FILE环境变量
+    ///
+    /// ## 参数
+    ///
+    /// - `local_envs` : 当前任务的环境变量列表
+    /// - `path` : 环境变量值，即target文件路径
+    ///
+    /// ## 返回值
+    ///
+    /// 无
+    pub fn set_env(&self, local_envs: &mut EnvMap, path: &PathBuf) {
+        let path = path.as_path().to_str().unwrap().to_string();
+        local_envs.add(EnvVar::new("DADK_RUST_TARGET_FILE".to_string(), path));
     }
 
-    // 清理临时文件夹下的各target文件
+    /// 清理生成的临时dadk目录
     pub fn clean_tmpdadk(&self) -> Result<(), ExecutorError> {
-        for (_, path) in self.dadk2tmp.iter() {
-            if path.exists() {
-                std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e))?;
-            }
+        if self.tmp_target_path.exists() {
+            std::fs::remove_dir_all(Self::dir(&self.tmp_target_path))
+                .map_err(|e| ExecutorError::IoError(e))?;
         }
         return Ok(());
+    }
+
+    /// 获取文件所在的目录路径
+    ///
+    /// ## 参数
+    ///
+    /// - `path` : 文件路径
+    ///
+    /// ## 返回值
+    ///
+    /// 文件所在目录路径
+    pub fn dir(path: &PathBuf) -> PathBuf {
+        let path_str = path.as_path().to_str().unwrap();
+        let index = path_str.rfind('/').unwrap();
+        return PathBuf::from(path_str[..index + 1].to_string());
+    }
+
+    pub fn is_user_target(rust_target: &str) -> bool {
+        // 如果包含目录层次的话，说明用户使用的是自己的target文件
+        return rust_target.contains('/') || rust_target.contains('\\');
+    }
+
+    pub fn tmp_target_path(&self) -> &PathBuf {
+        return &self.tmp_target_path;
     }
 }
