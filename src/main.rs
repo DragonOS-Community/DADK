@@ -83,6 +83,7 @@
 //! - 支持自动更新
 //! - 完善clean命令的逻辑
 
+#![feature(extract_if)]
 #![feature(io_error_more)]
 
 #[macro_use]
@@ -103,7 +104,7 @@ use simple_logger::SimpleLogger;
 use crate::{
     console::{interactive::InteractiveConsole, CommandLineArgs},
     executor::cache::cache_root_init,
-    scheduler::Scheduler,
+    scheduler::{task_deque::TASK_DEQUE, Scheduler},
 };
 
 mod console;
@@ -123,6 +124,7 @@ fn main() {
     let dragonos_dir = args.dragonos_dir.clone();
     let config_dir = args.config_dir.clone();
     let action = args.action;
+    let thread = args.thread;
     info!(
         "DragonOS sysroot dir: {}",
         dragonos_dir
@@ -136,6 +138,12 @@ fn main() {
             .map_or_else(|| "None".to_string(), |d| d.display().to_string())
     );
     info!("Action: {:?}", action);
+    info!(
+        "Thread num: {}",
+        thread
+            .as_ref()
+            .map_or_else(|| "None".to_string(), |d| d.to_string())
+    );
 
     match action {
         console::Action::New => {
@@ -147,6 +155,10 @@ fn main() {
             exit(0);
         }
         _ => {}
+    }
+
+    if let Some(thread) = thread {
+        TASK_DEQUE.lock().unwrap().set_thread(thread);
     }
 
     // 初始化缓存目录

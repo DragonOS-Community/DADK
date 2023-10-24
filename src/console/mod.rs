@@ -39,6 +39,10 @@ pub struct CommandLineArgs {
     /// DADK缓存根目录
     #[arg(long, value_parser = parse_check_dir_exists)]
     pub cache_dir: Option<PathBuf>,
+
+    /// DADK任务并行线程数量
+    #[arg(short, long)]
+    pub thread: Option<usize>,
 }
 
 /// @brief 检查目录是否存在

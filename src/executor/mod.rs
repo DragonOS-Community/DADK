@@ -3,8 +3,7 @@ use std::{
     env::Vars,
     path::PathBuf,
     process::{Command, Stdio},
-    rc::Rc,
-    sync::RwLock,
+    sync::{Arc, RwLock},
 };
 
 use log::{debug, error, info, warn};
@@ -29,7 +28,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct Executor {
-    entity: Rc<SchedEntity>,
+    entity: Arc<SchedEntity>,
     action: Action,
     local_envs: EnvMap,
     /// 任务构建结果输出到的目录
@@ -54,7 +53,7 @@ impl Executor {
     /// * `Ok(Executor)` - 创建成功
     /// * `Err(ExecutorError)` - 创建失败
     pub fn new(
-        entity: Rc<SchedEntity>,
+        entity: Arc<SchedEntity>,
         action: Action,
         dragonos_sysroot: PathBuf,
     ) -> Result<Self, ExecutorError> {
@@ -145,7 +144,8 @@ impl Executor {
 
     /// # 执行安装操作，把构建结果安装到DragonOS
     fn install(&self) -> Result<(), ExecutorError> {
-        let in_dragonos_path = self.entity.task().install.in_dragonos_path.as_ref();
+        let binding = self.entity.task();
+        let in_dragonos_path = binding.install.in_dragonos_path.as_ref();
         // 如果没有指定安装路径，则不执行安装
         if in_dragonos_path.is_none() {
             return Ok(());
@@ -326,7 +326,8 @@ impl Executor {
     /// # 准备工作线程本地环境变量
     fn prepare_local_env(&mut self) -> Result<(), ExecutorError> {
         // 设置本地环境变量
-        let task_envs: Option<&Vec<TaskEnv>> = self.entity.task().envs.as_ref();
+        let binding = self.entity.task();
+        let task_envs: Option<&Vec<TaskEnv>> = binding.envs.as_ref();
         if task_envs.is_none() {
             return Ok(());
         }
@@ -504,7 +505,7 @@ pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> 
     env_list.add_vars(envs);
 
     // 为每个任务创建特定的环境变量
-    for entity in sched_entities.iter() {
+    for entity in sched_entities.entities().iter() {
         // 导出任务的构建目录环境变量
         let build_dir = CacheDir::build_dir(entity.clone())?;
 

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, sync::Arc};
 
 use log::info;
 
@@ -78,7 +78,7 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
 #[derive(Debug, Clone)]
 pub struct CacheDir {
     #[allow(dead_code)]
-    entity: Rc<SchedEntity>,
+    entity: Arc<SchedEntity>,
     pub path: PathBuf,
     pub cache_type: CacheDirType,
 }
@@ -92,9 +92,9 @@ pub enum CacheDirType {
 impl CacheDir {
     pub const DADK_BUILD_CACHE_DIR_ENV_KEY_PREFIX: &'static str = "DADK_BUILD_CACHE_DIR";
     pub const DADK_SOURCE_CACHE_DIR_ENV_KEY_PREFIX: &'static str = "DADK_SOURCE_CACHE_DIR";
-    pub fn new(entity: Rc<SchedEntity>, cache_type: CacheDirType) -> Result<Self, ExecutorError> {
+    pub fn new(entity: Arc<SchedEntity>, cache_type: CacheDirType) -> Result<Self, ExecutorError> {
         let task = entity.task();
-        let path = Self::get_path(task, cache_type);
+        let path = Self::get_path(&task, cache_type);
 
         let result = Self {
             entity,
@@ -122,15 +122,15 @@ impl CacheDir {
         return PathBuf::from(cache_dir);
     }
 
-    pub fn build_dir(entity: Rc<SchedEntity>) -> Result<PathBuf, ExecutorError> {
-        return Ok(Self::new(entity, CacheDirType::Build)?.path);
+    pub fn build_dir(entity: Arc<SchedEntity>) -> Result<PathBuf, ExecutorError> {
+        return Ok(Self::new(entity.clone(), CacheDirType::Build)?.path);
     }
 
-    pub fn source_dir(entity: Rc<SchedEntity>) -> Result<PathBuf, ExecutorError> {
-        return Ok(Self::new(entity, CacheDirType::Source)?.path);
+    pub fn source_dir(entity: Arc<SchedEntity>) -> Result<PathBuf, ExecutorError> {
+        return Ok(Self::new(entity.clone(), CacheDirType::Source)?.path);
     }
 
-    pub fn build_dir_env_key(entity: &Rc<SchedEntity>) -> Result<String, ExecutorError> {
+    pub fn build_dir_env_key(entity: &Arc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
         return Ok(format!(
             "{}_{}",
@@ -139,7 +139,7 @@ impl CacheDir {
         ));
     }
 
-    pub fn source_dir_env_key(entity: &Rc<SchedEntity>) -> Result<String, ExecutorError> {
+    pub fn source_dir_env_key(entity: &Arc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
         return Ok(format!(
             "{}_{}",
@@ -148,7 +148,7 @@ impl CacheDir {
         ));
     }
 
-    pub fn need_source_cache(entity: &Rc<SchedEntity>) -> bool {
+    pub fn need_source_cache(entity: &Arc<SchedEntity>) -> bool {
         let task_type = &entity.task().task_type;
 
         if let TaskType::BuildFromSource(cs) = task_type {
