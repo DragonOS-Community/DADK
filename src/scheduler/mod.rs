@@ -11,7 +11,7 @@ use log::{error, info};
 
 use crate::{
     console::Action,
-    executor::{target::TargetManager, Executor},
+    executor::{target::Target, Executor},
     parser::task::DADKTask,
 };
 
@@ -24,7 +24,7 @@ pub struct SchedEntity {
     /// 任务
     task: DADKTask,
     /// target管理
-    target: Option<TargetManager>,
+    target: Option<Target>,
 }
 
 impl PartialEq for SchedEntity {
@@ -55,12 +55,12 @@ impl SchedEntity {
     }
 
     #[allow(dead_code)]
-    pub fn target(&self) -> &Option<TargetManager> {
+    pub fn target(&self) -> &Option<Target> {
         &self.target
     }
 
     #[allow(dead_code)]
-    pub fn target_mut(&mut self) -> &mut Option<TargetManager> {
+    pub fn target_mut(&mut self) -> &mut Option<Target> {
         &mut self.target
     }
 }
@@ -305,22 +305,22 @@ impl Scheduler {
         &self,
         path: &PathBuf,
         rust_target: &Option<String>,
-    ) -> Result<Option<TargetManager>, SchedulerError> {
+    ) -> Result<Option<Target>, SchedulerError> {
         if let Some(rust_target) = rust_target {
             // 如果rust_target字段不为none，说明需要target管理
             // 获取dadk任务路径，用于生成临时dadk文件名
             let file_str = path.as_path().to_str().unwrap();
-            let tmp_dadk_path = TargetManager::tmp_dadk(file_str);
+            let tmp_dadk_path = Target::tmp_dadk(file_str);
             let tmp_dadk_str = tmp_dadk_path.as_path().to_str().unwrap();
 
-            if TargetManager::is_user_target(rust_target) {
+            if Target::is_user_target(rust_target) {
                 // 如果target文件是用户自己的
-                if let Ok(target_path) = TargetManager::user_target_path(rust_target) {
+                if let Ok(target_path) = Target::user_target_path(rust_target) {
                     let target_path_str = target_path.as_path().to_str().unwrap();
                     let index = target_path_str.rfind('/').unwrap();
                     let target_name = target_path_str[index + 1..].to_string();
                     let tmp_target = PathBuf::from(format!("{}{}", tmp_dadk_str, target_name));
-                    return Ok(Some(TargetManager::new(tmp_target)));
+                    return Ok(Some(Target::new(tmp_target)));
                 } else {
                     return Err(SchedulerError::TaskError(
                         "The path of target file is invalid.".to_string(),
@@ -328,8 +328,8 @@ impl Scheduler {
                 }
             } else {
                 // 如果target文件是内置的
-                let tmp_target = PathBuf::from(format!("{}{}", tmp_dadk_str, "target.json"));
-                return Ok(Some(TargetManager::new(tmp_target)));
+                let tmp_target = PathBuf::from(format!("{}{}.json", tmp_dadk_str, rust_target));
+                return Ok(Some(Target::new(tmp_target)));
             }
         }
         return Ok(None);

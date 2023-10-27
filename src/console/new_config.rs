@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    elements::Input,
+    elements::{ChooseYesOrNo, Input},
     interactive::{InputFunc, InteractiveCommand},
     ConsoleError,
 };
@@ -169,13 +169,18 @@ impl NewConfigCommand {
 
     // 输入编译target
     fn input_rust_target(&self) -> Result<Option<String>, ConsoleError> {
-        let rust_target = Input::new(
-            Some("Please input the [description] of the task:".to_string()),
-            None,
-        )
-        .input()?;
+        let choice = ChooseYesOrNo::new("Input rust_target?".to_string()).choose_until_valid()?;
 
-        return Ok(Some(rust_target));
+        if choice {
+            let rust_target = Input::new(
+                Some("Please input the [rust_target] of the task:".to_string()),
+                None,
+            )
+            .input()?;
+            return Ok(Some(rust_target));
+        }
+
+        return Ok(None);
     }
 }
 
