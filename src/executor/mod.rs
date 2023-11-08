@@ -348,6 +348,12 @@ impl Executor {
                 .add(EnvVar::new(tv.key().to_string(), tv.value().to_string()));
         }
 
+        // 添加`DADK_CURRENT_BUILD_DIR`环境变量，便于构建脚本把构建结果拷贝到这里
+        self.local_envs.add(EnvVar::new(
+            "DADK_CURRENT_BUILD_DIR".to_string(),
+            self.build_dir.path.to_str().unwrap().to_string(),
+        ));
+
         return Ok(());
     }
 
@@ -546,11 +552,6 @@ pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> 
         let build_dir_key = CacheDir::build_dir_env_key(&entity)?;
         env_list.add(EnvVar::new(
             build_dir_key,
-            build_dir.to_str().unwrap().to_string(),
-        ));
-        // 添加`DADK_CURRENT_BUILD_DIR`环境变量，便于构建脚本把构建结果拷贝到这里
-        env_list.add(EnvVar::new(
-            "DADK_CURRENT_BUILD_DIR".to_string(),
             build_dir.to_str().unwrap().to_string(),
         ));
 

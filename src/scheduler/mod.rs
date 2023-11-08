@@ -509,7 +509,6 @@ impl Scheduler {
         mut count: usize,
         r: &Vec<Arc<SchedEntity>>,
     ) {
-        log::warn!("daemon");
         let mut guard = TASK_DEQUE.lock().unwrap();
         // 初始化0入度的任务实体
         let mut zero_entity: Vec<Arc<SchedEntity>> = Vec::new();
