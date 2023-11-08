@@ -548,6 +548,11 @@ pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> 
             build_dir_key,
             build_dir.to_str().unwrap().to_string(),
         ));
+        // 添加`DADK_CURRENT_BUILD_DIR`环境变量，便于构建脚本把构建结果拷贝到这里
+        env_list.add(EnvVar::new(
+            "DADK_CURRENT_BUILD_DIR".to_string(),
+            build_dir.to_str().unwrap().to_string(),
+        ));
 
         // 如果需要源码缓存目录，则导出
         if CacheDir::need_source_cache(entity) {
