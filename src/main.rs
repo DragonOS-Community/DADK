@@ -111,6 +111,7 @@ mod console;
 mod executor;
 mod parser;
 mod scheduler;
+pub mod static_resources;
 mod utils;
 
 fn main() {

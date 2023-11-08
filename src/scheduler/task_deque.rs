@@ -46,7 +46,7 @@ impl TaskDeque {
         dragonos_dir: PathBuf,
         entity: Arc<SchedEntity>,
     ) -> bool {
-        log::warn!("push stack: task:{} {entity:?}", entity.id());
+        // log::warn!("push stack: task:{} {entity:?}", entity.id());
         if self.queue.len() < self.max_num {
             let id = entity.id();
             let handler = std::thread::spawn(move || {
