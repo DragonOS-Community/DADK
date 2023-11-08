@@ -21,6 +21,7 @@ use self::cache::CacheDirType;
 
 pub mod cache;
 pub mod source;
+pub mod target;
 
 lazy_static! {
     // 全局环境变量的列表
@@ -124,6 +125,8 @@ impl Executor {
 
     /// # 执行build操作
     fn build(&mut self) -> Result<(), ExecutorError> {
+        self.mv_target_to_tmp()?;
+
         // 确认源文件就绪
         self.prepare_input()?;
 
@@ -172,6 +175,11 @@ impl Executor {
         FileUtils::copy_dir_all(&build_dir, &install_path)
             .map_err(|e| ExecutorError::InstallError(e))?;
         info!("Task {} installed.", self.entity.task().name_version());
+
+        // 安装完后，删除临时target文件
+        if let Some(target) = self.entity.target() {
+            target.clean_tmpdadk()?;
+        }
 
         return Ok(());
     }
@@ -244,6 +252,7 @@ impl Executor {
             self.entity.task().name_version(),
             self.build_dir.path
         );
+
         return self.build_dir.remove_self_recursive();
     }
 
@@ -259,7 +268,6 @@ impl Executor {
             self.entity.task().name_version(),
             self.src_work_dir().display()
         );
-
         return cache_dir.unwrap().remove_self_recursive();
     }
 
@@ -326,6 +334,8 @@ impl Executor {
     /// # 准备工作线程本地环境变量
     fn prepare_local_env(&mut self) -> Result<(), ExecutorError> {
         // 设置本地环境变量
+        self.prepare_target_env()?;
+
         let task_envs: Option<&Vec<TaskEnv>> = self.entity.task().envs.as_ref();
         if task_envs.is_none() {
             return Ok(());
@@ -436,6 +446,30 @@ impl Executor {
             error!("{errmsg}");
             return Err(ExecutorError::TaskFailed(errmsg));
         }
+    }
+
+    pub fn mv_target_to_tmp(&mut self) -> Result<(), ExecutorError> {
+        if let Some(rust_target) = self.entity.task().rust_target.clone() {
+            // 将target文件拷贝至 /tmp 下对应的dadk文件的临时target文件中
+            self.entity
+                .target()
+                .as_ref()
+                .unwrap()
+                .cp_to_tmp(&rust_target)?;
+        }
+        return Ok(());
+    }
+
+    pub fn prepare_target_env(&mut self) -> Result<(), ExecutorError> {
+        if self.entity.task().rust_target.is_some() {
+            // 如果有dadk任务有rust_target字段，需要设置DADK_RUST_TARGET_FILE环境变量，值为临时target文件路径
+            self.entity
+                .target()
+                .as_ref()
+                .unwrap()
+                .prepare_env(&mut self.local_envs);
+        }
+        return Ok(());
     }
 }
 

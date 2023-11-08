@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    elements::Input,
+    elements::{ChooseYesOrNo, Input},
     interactive::{InputFunc, InteractiveCommand},
     ConsoleError,
 };
@@ -98,7 +98,7 @@ impl NewConfigCommand {
             "name: {}, version: {}, description: {}",
             name, version, description
         );
-
+        let rust_target = self.input_rust_target()?;
         let task_type: TaskType = TaskTypeInput::new().input()?;
         debug!("task_type: {:?}", task_type);
 
@@ -121,6 +121,7 @@ impl NewConfigCommand {
             name,
             version,
             description,
+            rust_target,
             task_type,
             dep,
             build_config,
@@ -164,6 +165,22 @@ impl NewConfigCommand {
         .input()?;
 
         return Ok(description);
+    }
+
+    // 输入编译target
+    fn input_rust_target(&self) -> Result<Option<String>, ConsoleError> {
+        let choice = ChooseYesOrNo::new("Input rust_target?".to_string()).choose_until_valid()?;
+
+        if choice {
+            let rust_target = Input::new(
+                Some("Please input the [rust_target] of the task:".to_string()),
+                None,
+            )
+            .input()?;
+            return Ok(Some(rust_target));
+        }
+
+        return Ok(None);
     }
 }
 
