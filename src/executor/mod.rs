@@ -455,13 +455,13 @@ impl Executor {
                 .target()
                 .as_ref()
                 .unwrap()
-                .mv_to_tmp(&rust_target)?;
+                .cp_to_tmp(&rust_target)?;
         }
         return Ok(());
     }
 
     pub fn prepare_target_env(&mut self) -> Result<(), ExecutorError> {
-        if let Some(_) = self.entity.task().rust_target.clone() {
+        if self.entity.task().rust_target.is_some() {
             // 如果有dadk任务有rust_target字段，需要设置DADK_RUST_TARGET_FILE环境变量，值为临时target文件路径
             self.entity
                 .target()

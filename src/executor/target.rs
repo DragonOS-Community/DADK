@@ -47,7 +47,7 @@ impl Target {
     ///
     /// Ok(()) 拷贝成功
     /// Err(ExecutorError) 拷贝失败
-    pub fn mv_to_tmp(&self, rust_target: &str) -> Result<(), ExecutorError> {
+    pub fn cp_to_tmp(&self, rust_target: &str) -> Result<(), ExecutorError> {
         // 创建临时target文件
         if Self::is_user_target(rust_target) {
             // 如果是用户的target文件，则从源target文件路径from拷贝
