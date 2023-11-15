@@ -461,6 +461,7 @@ impl ArchiveFile {
         let archive_name = archive_path.file_name().unwrap().to_str().unwrap();
         for (regex, archivetype) in [
             (Regex::new(r"^(.+)\.tar\.gz$").unwrap(), ArchiveType::TarGz),
+            (Regex::new(r"^(.+)\.tar\.xz$").unwrap(), ArchiveType::TarXz),
             (Regex::new(r"^(.+)\.zip$").unwrap(), ArchiveType::Zip),
         ] {
             if regex.is_match(archive_name) {
@@ -500,9 +501,9 @@ impl ArchiveFile {
         }
         //根据压缩文件的类型生成cmd指令
         match &self.archive_type {
-            ArchiveType::TarGz => {
+            ArchiveType::TarGz | ArchiveType::TarXz => {
                 let mut cmd = Command::new("tar");
-                cmd.arg("-xzf").arg(&self.archive_name);
+                cmd.arg("-xf").arg(&self.archive_name);
                 let proc: std::process::Child = cmd
                     .current_dir(path)
                     .stderr(Stdio::piped())
@@ -575,6 +576,7 @@ impl ArchiveFile {
 
 pub enum ArchiveType {
     TarGz,
+    TarXz,
     Zip,
     Undefined,
 }
