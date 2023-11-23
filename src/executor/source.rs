@@ -427,7 +427,7 @@ impl ArchiveSource {
             })?
         {
             //如果source文件夹非空，就直接使用，不再重复下载压缩文件，这里可以考虑加入交互
-            info!("Source files already exist. Using previous source file cache. You should clean {:?} before re-download the archive ",target_dir);
+            info!("Source files already exist. Using previous source file cache. You should clean {:?} before re-download the archive ", target_dir.path);
             return Ok(());
         }
 
