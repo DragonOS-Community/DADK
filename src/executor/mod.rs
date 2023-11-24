@@ -325,7 +325,7 @@ impl Executor {
         }
         drop(env_list);
         for (key, value) in self.local_envs.envs.iter() {
-            warn!("Local env found: {}={}", key, value.value);
+            debug!("Local env found: {}={}", key, value.value);
             command.env(key, value.value.clone());
         }
 
