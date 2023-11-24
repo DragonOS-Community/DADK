@@ -325,6 +325,7 @@ impl Executor {
         }
         drop(env_list);
         for (key, value) in self.local_envs.envs.iter() {
+            debug!("Local env found: {}={}", key, value.value);
             command.env(key, value.value.clone());
         }
 
@@ -338,14 +339,12 @@ impl Executor {
 
         let binding = self.entity.task();
         let task_envs: Option<&Vec<TaskEnv>> = binding.envs.as_ref();
-        if task_envs.is_none() {
-            return Ok(());
-        }
 
-        let task_envs = task_envs.unwrap();
-        for tv in task_envs.iter() {
-            self.local_envs
-                .add(EnvVar::new(tv.key().to_string(), tv.value().to_string()));
+        if let Some(task_envs) = task_envs {
+            for tv in task_envs.iter() {
+                self.local_envs
+                    .add(EnvVar::new(tv.key().to_string(), tv.value().to_string()));
+            }
         }
 
         // 添加`DADK_CURRENT_BUILD_DIR`环境变量，便于构建脚本把构建结果拷贝到这里
