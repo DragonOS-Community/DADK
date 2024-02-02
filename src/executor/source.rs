@@ -96,7 +96,7 @@ impl GitSource {
         // 检查目标目录中的仓库是否为所指定仓库
         if !self.check_repo(target_dir).map_err(|e| {
             format!(
-                "Failed to check if target dir is empty: {}, message: {e:?}",
+                "Failed to check repo: {}, message: {e:?}",
                 target_dir.path.display()
             )
         })? {
