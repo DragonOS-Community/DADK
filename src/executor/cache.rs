@@ -75,18 +75,18 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
     return Ok(());
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum CacheDirType {
+    Build,
+    Source,
+}
+
 #[derive(Debug, Clone)]
 pub struct CacheDir {
     #[allow(dead_code)]
     entity: Arc<SchedEntity>,
     pub path: PathBuf,
     pub cache_type: CacheDirType,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CacheDirType {
-    Build,
-    Source,
 }
 
 impl CacheDir {

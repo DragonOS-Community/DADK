@@ -81,17 +81,28 @@ impl GitSource {
     ///
     /// ## 参数
     ///
-    /// * `target_dir` - 目标目录
+    /// - `target_dir` - 目标目录
     ///
     /// ## 返回
     ///
-    /// * `Ok(())` - 成功
-    /// * `Err(String)` - 失败，错误信息
+    /// - `Ok(())` - 成功
+    /// - `Err(String)` - 失败，错误信息
     pub fn prepare(&self, target_dir: &CacheDir) -> Result<(), String> {
         info!(
             "Preparing git repo: {}, branch: {:?}, revision: {:?}",
             self.url, self.branch, self.revision
         );
+
+        // 检查目标目录中的仓库是否为所指定仓库
+        if !self.check_repo(target_dir).map_err(|e| {
+            format!(
+                "Failed to check if target dir is empty: {}, message: {e:?}",
+                target_dir.path.display()
+            )
+        })? {
+            info!("Target dir isn't specified repo, remove target dir");
+            target_dir.remove_self_recursive().unwrap()
+        }
 
         target_dir.create().map_err(|e| {
             format!(
@@ -115,6 +126,40 @@ impl GitSource {
         self.pull(target_dir)?;
 
         return Ok(());
+    }
+
+    fn check_repo(&self, target_dir: &CacheDir) -> Result<bool, String> {
+        let path: &PathBuf = &target_dir.path;
+        let mut cmd = Command::new("git");
+        cmd.arg("remote").arg("get-url").arg("origin");
+
+        // 设置工作目录
+        cmd.current_dir(path);
+
+        // 创建子进程，执行命令
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let mut r = String::from_utf8(output.stdout).unwrap();
+            r.pop();
+            println!("output: {}, self.url: {}", r, self.url);
+            if r == self.url {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            return Err(format!(
+                "git remote get-url origin failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
     }
 
     fn checkout(&self, target_dir: &CacheDir) -> Result<(), String> {
