@@ -93,7 +93,7 @@ impl GitSource {
             self.url, self.branch, self.revision
         );
 
-        // 检查目标目录中的仓库是否为所指定仓库
+        // 确保目标目录中的仓库为所指定仓库
         if !self.check_repo(target_dir).map_err(|e| {
             format!(
                 "Failed to check repo: {}, message: {e:?}",
@@ -147,12 +147,7 @@ impl GitSource {
         if output.status.success() {
             let mut r = String::from_utf8(output.stdout).unwrap();
             r.pop();
-            println!("output: {}, self.url: {}", r, self.url);
-            if r == self.url {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
+            Ok(r == self.url)
         } else {
             return Err(format!(
                 "git remote get-url origin failed, status: {:?},  stderr: {:?}",
