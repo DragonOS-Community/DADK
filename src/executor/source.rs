@@ -93,17 +93,6 @@ impl GitSource {
             self.url, self.branch, self.revision
         );
 
-        // 确保目标目录中的仓库为所指定仓库
-        if !self.check_repo(target_dir).map_err(|e| {
-            format!(
-                "Failed to check repo: {}, message: {e:?}",
-                target_dir.path.display()
-            )
-        })? {
-            info!("Target dir isn't specified repo, change remote url");
-            self.set_url(target_dir)?;
-        }
-
         target_dir.create().map_err(|e| {
             format!(
                 "Failed to create target dir: {}, message: {e:?}",
@@ -121,9 +110,20 @@ impl GitSource {
             self.clone_repo(target_dir)?;
         }
 
-        self.checkout(target_dir)?;
+        // 确保目标目录中的仓库为所指定仓库
+        if !self.check_repo(target_dir).map_err(|e| {
+            format!(
+                "Failed to check repo: {}, message: {e:?}",
+                target_dir.path.display()
+            )
+        })? {
+            info!("Target dir isn't specified repo, change remote url");
+            self.set_url(target_dir)?;
+        }
 
         self.pull(target_dir)?;
+
+        self.checkout(target_dir)?;
 
         return Ok(());
     }
