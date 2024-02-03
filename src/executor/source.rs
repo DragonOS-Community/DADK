@@ -100,8 +100,8 @@ impl GitSource {
                 target_dir.path.display()
             )
         })? {
-            info!("Target dir isn't specified repo, remove target dir");
-            target_dir.remove_self_recursive().unwrap()
+            info!("Target dir isn't specified repo, change remote url");
+            self.set_url(target_dir)?;
         }
 
         target_dir.create().map_err(|e| {
@@ -160,6 +160,31 @@ impl GitSource {
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
             ));
         }
+    }
+
+    fn set_url(&self, target_dir: &CacheDir) -> Result<(), String> {
+        let path: &PathBuf = &target_dir.path;
+        let mut cmd = Command::new("git");
+        cmd.arg("remote").arg("set-url").arg("origin").arg(self.url.as_str());
+
+        // 设置工作目录
+        cmd.current_dir(path);
+
+        // 创建子进程，执行命令
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "git remote set-url origin failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+        Ok(())
     }
 
     fn checkout(&self, target_dir: &CacheDir) -> Result<(), String> {
