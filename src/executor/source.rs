@@ -121,9 +121,9 @@ impl GitSource {
             self.set_url(target_dir)?;
         }
 
-        self.pull(target_dir)?;
-
         self.checkout(target_dir)?;
+
+        self.pull(target_dir)?;
 
         return Ok(());
     }
