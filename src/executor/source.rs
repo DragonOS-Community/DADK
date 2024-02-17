@@ -81,12 +81,12 @@ impl GitSource {
     ///
     /// ## 参数
     ///
-    /// * `target_dir` - 目标目录
+    /// - `target_dir` - 目标目录
     ///
     /// ## 返回
     ///
-    /// * `Ok(())` - 成功
-    /// * `Err(String)` - 失败，错误信息
+    /// - `Ok(())` - 成功
+    /// - `Err(String)` - 失败，错误信息
     pub fn prepare(&self, target_dir: &CacheDir) -> Result<(), String> {
         info!(
             "Preparing git repo: {}, branch: {:?}, revision: {:?}",
@@ -117,7 +117,75 @@ impl GitSource {
         return Ok(());
     }
 
+    fn check_repo(&self, target_dir: &CacheDir) -> Result<bool, String> {
+        let path: &PathBuf = &target_dir.path;
+        let mut cmd = Command::new("git");
+        cmd.arg("remote").arg("get-url").arg("origin");
+
+        // 设置工作目录
+        cmd.current_dir(path);
+
+        // 创建子进程，执行命令
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let mut r = String::from_utf8(output.stdout).unwrap();
+            r.pop();
+            Ok(r == self.url)
+        } else {
+            return Err(format!(
+                "git remote get-url origin failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+    }
+
+    fn set_url(&self, target_dir: &CacheDir) -> Result<(), String> {
+        let path: &PathBuf = &target_dir.path;
+        let mut cmd = Command::new("git");
+        cmd.arg("remote")
+            .arg("set-url")
+            .arg("origin")
+            .arg(self.url.as_str());
+
+        // 设置工作目录
+        cmd.current_dir(path);
+
+        // 创建子进程，执行命令
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "git remote set-url origin failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+        Ok(())
+    }
+
     fn checkout(&self, target_dir: &CacheDir) -> Result<(), String> {
+        // 确保目标目录中的仓库为所指定仓库
+        if !self.check_repo(target_dir).map_err(|e| {
+            format!(
+                "Failed to check repo: {}, message: {e:?}",
+                target_dir.path.display()
+            )
+        })? {
+            info!("Target dir isn't specified repo, change remote url");
+            self.set_url(target_dir)?;
+        }
+
         let do_checkout = || -> Result<(), String> {
             let mut cmd = Command::new("git");
             cmd.current_dir(&target_dir.path);
