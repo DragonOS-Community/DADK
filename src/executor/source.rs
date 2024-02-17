@@ -160,7 +160,10 @@ impl GitSource {
     fn set_url(&self, target_dir: &CacheDir) -> Result<(), String> {
         let path: &PathBuf = &target_dir.path;
         let mut cmd = Command::new("git");
-        cmd.arg("remote").arg("set-url").arg("origin").arg(self.url.as_str());
+        cmd.arg("remote")
+            .arg("set-url")
+            .arg("origin")
+            .arg(self.url.as_str());
 
         // 设置工作目录
         cmd.current_dir(path);
