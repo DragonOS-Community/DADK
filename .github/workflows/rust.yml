@@ -26,8 +26,5 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install toolchain
-      run: rustup component add rustfmt --toolchain nightly-2023-08-15-x86_64-unknown-linux-gnu
-
     - name: Check formatting
       run: cargo fmt --check
