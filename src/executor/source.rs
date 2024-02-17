@@ -110,17 +110,6 @@ impl GitSource {
             self.clone_repo(target_dir)?;
         }
 
-        // 确保目标目录中的仓库为所指定仓库
-        if !self.check_repo(target_dir).map_err(|e| {
-            format!(
-                "Failed to check repo: {}, message: {e:?}",
-                target_dir.path.display()
-            )
-        })? {
-            info!("Target dir isn't specified repo, change remote url");
-            self.set_url(target_dir)?;
-        }
-
         self.checkout(target_dir)?;
 
         self.pull(target_dir)?;
@@ -186,6 +175,17 @@ impl GitSource {
     }
 
     fn checkout(&self, target_dir: &CacheDir) -> Result<(), String> {
+        // 确保目标目录中的仓库为所指定仓库
+        if !self.check_repo(target_dir).map_err(|e| {
+            format!(
+                "Failed to check repo: {}, message: {e:?}",
+                target_dir.path.display()
+            )
+        })? {
+            info!("Target dir isn't specified repo, change remote url");
+            self.set_url(target_dir)?;
+        }
+
         let do_checkout = || -> Result<(), String> {
             let mut cmd = Command::new("git");
             cmd.current_dir(&target_dir.path);
