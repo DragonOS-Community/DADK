@@ -1,6 +1,12 @@
-use std::{fs::File, path::Path, process::Command};
+use std::{
+    fs::File,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 use reqwest::{blocking::ClientBuilder, Url};
+
+use super::stdio::StdioUtils;
 
 pub struct FileUtils;
 
@@ -46,11 +52,18 @@ impl FileUtils {
         cmd.current_dir(src);
 
         // 创建子进程，执行命令
-        let proc: std::process::Child = cmd.spawn().map_err(|e| e.to_string())?;
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
         let output = proc.wait_with_output().map_err(|e| e.to_string())?;
 
         if !output.status.success() {
-            return Err("copy_dir_all error".to_string());
+            return Err(format!(
+                "copy_dir_all failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
         }
         Ok(())
     }
