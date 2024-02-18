@@ -1,4 +1,4 @@
-use std::{fs::File, path::Path};
+use std::{fs::File, path::Path, process::Command};
 
 use reqwest::{blocking::ClientBuilder, Url};
 
@@ -40,20 +40,17 @@ impl FileUtils {
 
     /// 递归地复制给定目录下所有文件到另一个文件夹中
     pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
-        if src.is_dir() {
-            std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
-            for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
-                let entry = entry.map_err(|e| e.to_string())?;
-                let path = entry.path();
-                let dst_path = dst.join(path.file_name().unwrap());
-                if path.is_dir() {
-                    FileUtils::copy_dir_all(&path, &dst_path).map_err(|e| e.to_string())?;
-                } else {
-                    std::fs::copy(&path, &dst_path).map_err(|e| e.to_string())?;
-                }
-            }
-        } else {
-            return Err(format!("No such source directory:{:?}", src));
+        let mut cmd = Command::new("cp");
+        cmd.arg("-r").arg("./").arg(dst);
+
+        cmd.current_dir(src);
+
+        // 创建子进程，执行命令
+        let proc: std::process::Child = cmd.spawn().map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err("copy_dir_all error".to_string());
         }
         Ok(())
     }
