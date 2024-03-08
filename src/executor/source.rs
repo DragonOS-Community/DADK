@@ -174,7 +174,7 @@ impl GitSource {
         Ok(())
     }
 
-     fn checkout(&self, target_dir: &CacheDir) -> Result<(), String> {
+    fn checkout(&self, target_dir: &CacheDir) -> Result<(), String> {
         // 确保目标目录中的仓库为所指定仓库
         if !self.check_repo(target_dir).map_err(|e| {
             format!(
