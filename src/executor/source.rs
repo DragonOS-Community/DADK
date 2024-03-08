@@ -204,7 +204,7 @@ impl GitSource {
                 cmd_str+=revision;
                 cmd_str+=" ";
             }
-            
+
             // 强制切换分支，且安静模式
             cmd.arg("-f").arg("-q");
             cmd_str+=" -f -q ";
@@ -217,7 +217,6 @@ impl GitSource {
             bash.current_dir(&target_dir.path);
             bash.arg("-c").arg(cmd_str);
 
-            
             // 创建子进程，执行命令
             let proc: std::process::Child = bash
                 .stderr(Stdio::piped())
@@ -282,11 +281,11 @@ impl GitSource {
         let output = proc.wait_with_output().map_err(|e| e.to_string())?;
 
         if !output.status.success() {
-                return Err(format!(
-                    "clone git repo failed, status: {:?},  stderr: {:?}",
-                    output.status,
-                    StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-                ));
+            return Err(format!(
+                "clone git repo failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
         }
         return Ok(());
     }
