@@ -188,37 +188,24 @@ impl GitSource {
 
         let do_checkout = || -> Result<(), String> {
             let mut cmd = Command::new("git");
+            let mut subcmd = Command::new("git");
+            subcmd.current_dir(&target_dir.path);
+            subcmd.arg("submodule").arg("update").arg("--remote");
             cmd.current_dir(&target_dir.path);
             cmd.arg("checkout");
 
-            //命令字符串，以用在后面的bash调参
-            let mut cmd_str = String::from("git checkout "); 
-
             if let Some(branch) = &self.branch {
                 cmd.arg(branch);
-                cmd_str+=branch;
-                cmd_str+=" ";
             }
             if let Some(revision) = &self.revision {
                 cmd.arg(revision);
-                cmd_str+=revision;
-                cmd_str+=" ";
             }
 
             // 强制切换分支，且安静模式
             cmd.arg("-f").arg("-q");
-            cmd_str+=" -f -q ";
-
-            //添加子模块checkout语句
-            cmd_str+="; git submodule update --remote ";
-
-            //bash设置路径和添加命令参数
-            let mut bash=Command::new("bash");
-            bash.current_dir(&target_dir.path);
-            bash.arg("-c").arg(cmd_str);
 
             // 创建子进程，执行命令
-            let proc: std::process::Child = bash
+            let proc: std::process::Child = cmd
                 .stderr(Stdio::piped())
                 .spawn()
                 .map_err(|e| e.to_string())?;
@@ -229,6 +216,20 @@ impl GitSource {
                     "Failed to checkout {}, message: {}",
                     target_dir.path.display(),
                     String::from_utf8_lossy(&output.stdout)
+                ));
+            }
+
+            let subproc: std::process::Child = subcmd
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+            let suboutput = subproc.wait_with_output().map_err(|e| e.to_string())?;
+
+            if !suboutput.status.success() {
+                return Err(format!(
+                    "Failed to checkout submodule {}, message: {}",
+                    target_dir.path.display(),
+                    String::from_utf8_lossy(&suboutput.stdout)
                 ));
             }
             return Ok(());
@@ -251,29 +252,28 @@ impl GitSource {
     pub fn clone_repo(&self, cache_dir: &CacheDir) -> Result<(), String> {
         let path: &PathBuf = &cache_dir.path;
         let mut cmd = Command::new("git");
+        let mut subcmd = Command::new("git");
         cmd.arg("clone").arg(&self.url).arg(".").arg("--recursive");
-
-        //命令行字符串，用于之后的bash添加参数
-        let mut cmd_str = String::from("git clone "); 
-        cmd_str+=&self.url;
-        cmd_str+="/. --recursive";
 
         if let Some(branch) = &self.branch {
             cmd.arg("--branch").arg(branch).arg("--depth").arg("1");
-            cmd_str+="--branch ";
-            cmd_str+=branch;
-            cmd_str+=" --depth 1 "
         }
 
-        cmd_str+="; git submodule update --init --recursive --force";
+        subcmd
+            .arg("submodule")
+            .arg("update")
+            .arg("--init")
+            .arg("--recursive")
+            .arg("--force");
 
-        //bash设置路径和添加命令参数
-        let mut bash=Command::new("bash");
-        bash.current_dir(path);
-        bash.arg("-c").arg(cmd_str);
+        // 对于克隆，如果指定了revision，则直接克隆整个仓库，稍后再切换到指定的revision
 
-        //创建子进程，执行命令
-        let proc: std::process::Child = bash
+        // 设置工作目录
+        cmd.current_dir(path);
+        subcmd.current_dir(path);
+
+        // 创建子进程，执行命令
+        let proc: std::process::Child = cmd
             .stderr(Stdio::piped())
             .stdout(Stdio::inherit())
             .spawn()
@@ -285,6 +285,21 @@ impl GitSource {
                 "clone git repo failed, status: {:?},  stderr: {:?}",
                 output.status,
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+
+        let subproc: std::process::Child = subcmd
+            .stderr(Stdio::piped())
+            .stdout(Stdio::inherit())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let suboutput = subproc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !suboutput.status.success() {
+            return Err(format!(
+                "clone submodule failed, status: {:?},  stderr: {:?}",
+                suboutput.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&suboutput.stderr), 5)
             ));
         }
         return Ok(());
