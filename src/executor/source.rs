@@ -219,7 +219,7 @@ impl GitSource {
                 ));
             }
 
-            //当克隆仓库的子进程结束后，启动子模块的子进程
+            //当checkout仓库的子进程结束后，启动子模块的子进程
             let subproc: std::process::Child = subcmd
                 .stderr(Stdio::piped())
                 .spawn()
