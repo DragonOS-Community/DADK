@@ -188,9 +188,6 @@ impl GitSource {
 
         let do_checkout = || -> Result<(), String> {
             let mut cmd = Command::new("git");
-            let mut subcmd = Command::new("git");
-            subcmd.current_dir(&target_dir.path);
-            subcmd.arg("submodule").arg("update").arg("--remote");
             cmd.current_dir(&target_dir.path);
             cmd.arg("checkout");
 
@@ -218,6 +215,10 @@ impl GitSource {
                     String::from_utf8_lossy(&output.stdout)
                 ));
             }
+
+            let mut subcmd = Command::new("git");
+            subcmd.current_dir(&target_dir.path);
+            subcmd.arg("submodule").arg("update").arg("--remote");
 
             //当checkout仓库的子进程结束后，启动checkout子模块的子进程
             let subproc: std::process::Child = subcmd
@@ -253,25 +254,16 @@ impl GitSource {
     pub fn clone_repo(&self, cache_dir: &CacheDir) -> Result<(), String> {
         let path: &PathBuf = &cache_dir.path;
         let mut cmd = Command::new("git");
-        let mut subcmd = Command::new("git");
         cmd.arg("clone").arg(&self.url).arg(".").arg("--recursive");
 
         if let Some(branch) = &self.branch {
             cmd.arg("--branch").arg(branch).arg("--depth").arg("1");
         }
 
-        subcmd
-            .arg("submodule")
-            .arg("update")
-            .arg("--init")
-            .arg("--recursive")
-            .arg("--force");
-
         // 对于克隆，如果指定了revision，则直接克隆整个仓库，稍后再切换到指定的revision
 
         // 设置工作目录
         cmd.current_dir(path);
-        subcmd.current_dir(path);
 
         // 创建子进程，执行命令
         let proc: std::process::Child = cmd
@@ -288,6 +280,16 @@ impl GitSource {
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
             ));
         }
+
+        let mut subcmd = Command::new("git");
+        subcmd
+            .arg("submodule")
+            .arg("update")
+            .arg("--init")
+            .arg("--recursive")
+            .arg("--force");
+
+        subcmd.current_dir(path);
 
         //当克隆仓库的子进程结束后，启动保证克隆子模块的子进程
         let subproc: std::process::Child = subcmd
