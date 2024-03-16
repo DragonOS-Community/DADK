@@ -215,6 +215,25 @@ impl GitSource {
                     String::from_utf8_lossy(&output.stdout)
                 ));
             }
+
+            let mut subcmd = Command::new("git");
+            subcmd.current_dir(&target_dir.path);
+            subcmd.arg("submodule").arg("update").arg("--remote");
+
+            //当checkout仓库的子进程结束后，启动checkout子模块的子进程
+            let subproc: std::process::Child = subcmd
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+            let suboutput = subproc.wait_with_output().map_err(|e| e.to_string())?;
+
+            if !suboutput.status.success() {
+                return Err(format!(
+                    "Failed to checkout submodule {}, message: {}",
+                    target_dir.path.display(),
+                    String::from_utf8_lossy(&suboutput.stdout)
+                ));
+            }
             return Ok(());
         };
 
@@ -259,6 +278,32 @@ impl GitSource {
                 "clone git repo failed, status: {:?},  stderr: {:?}",
                 output.status,
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+
+        let mut subcmd = Command::new("git");
+        subcmd
+            .arg("submodule")
+            .arg("update")
+            .arg("--init")
+            .arg("--recursive")
+            .arg("--force");
+
+        subcmd.current_dir(path);
+
+        //当克隆仓库的子进程结束后，启动保证克隆子模块的子进程
+        let subproc: std::process::Child = subcmd
+            .stderr(Stdio::piped())
+            .stdout(Stdio::inherit())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let suboutput = subproc.wait_with_output().map_err(|e| e.to_string())?;
+
+        if !suboutput.status.success() {
+            return Err(format!(
+                "clone submodule failed, status: {:?},  stderr: {:?}",
+                suboutput.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&suboutput.stderr), 5)
             ));
         }
         return Ok(());
