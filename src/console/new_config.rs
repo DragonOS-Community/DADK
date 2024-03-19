@@ -3,7 +3,7 @@ use std::{cell::RefCell, fmt::Debug, path::PathBuf, rc::Rc};
 use log::{debug, error, info};
 
 use crate::{
-    console::elements::{OptionalChoice, VecInput},
+    console::elements::{BoolInput, OptionalChoice, VecInput},
     executor::{
         cache::CacheDir,
         source::{ArchiveSource, GitSource, LocalSource},
@@ -117,6 +117,11 @@ impl NewConfigCommand {
         let task_env: Option<Vec<TaskEnv>> = TaskEnvInput::new().input()?;
         debug!("task_env: {:?}", task_env);
 
+        let build_once = BoolInput::new("Run this task once?".to_string(), None).input()?;
+        debug!("build_once: {:?}", build_once);
+        let install_once = BoolInput::new("Install this task once?".to_string(), None).input()?;
+        debug!("install_once: {:?}", install_once);
+
         let mut dadk: DADKTask = DADKTask::new(
             name,
             version,
@@ -128,6 +133,8 @@ impl NewConfigCommand {
             install_config,
             clean_config,
             task_env,
+            build_once,
+            install_once,
         );
 
         dadk.trim();
