@@ -11,12 +11,15 @@ use log::{debug, error, info, warn};
 use crate::{
     console::{clean::CleanLevel, Action},
     executor::cache::CacheDir,
-    parser::task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
+    parser::{
+        task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
+        task_log::{BuildStatus, InstallStatus, TaskLog},
+    },
     scheduler::{SchedEntities, SchedEntity},
     utils::file::FileUtils,
 };
 
-use self::cache::CacheDirType;
+use self::cache::{CacheDirType, TaskDataDir};
 
 pub mod cache;
 pub mod source;
@@ -36,6 +39,8 @@ pub struct Executor {
     build_dir: CacheDir,
     /// 如果任务需要源文件缓存，则此字段为 Some(CacheDir)，否则为 None（使用本地源文件路径）
     source_dir: Option<CacheDir>,
+    /// 任务数据目录
+    task_data_dir: TaskDataDir,
     /// DragonOS sysroot的路径
     dragonos_sysroot: PathBuf,
 }
@@ -60,6 +65,7 @@ impl Executor {
     ) -> Result<Self, ExecutorError> {
         let local_envs = EnvMap::new();
         let build_dir = CacheDir::new(entity.clone(), CacheDirType::Build)?;
+        let task_data_dir = TaskDataDir::new(entity.clone())?;
 
         let source_dir = if CacheDir::need_source_cache(&entity) {
             Some(CacheDir::new(entity.clone(), CacheDirType::Source)?)
@@ -73,6 +79,7 @@ impl Executor {
             local_envs,
             build_dir,
             source_dir,
+            task_data_dir,
             dragonos_sysroot,
         };
 
@@ -91,6 +98,48 @@ impl Executor {
     pub fn execute(&mut self) -> Result<(), ExecutorError> {
         info!("Execute task: {}", self.entity.task().name_version());
 
+        let r = self.do_execute();
+        self.save_task_data(r);
+        info!("Task {} finished", self.entity.task().name_version());
+        return Ok(());
+    }
+
+    /// # 保存任务数据
+    fn save_task_data(&self, r: Result<(), ExecutorError>) {
+        let mut task_log = self.task_data_dir.task_log();
+        match self.action {
+            Action::Build => {
+                if r.is_ok() {
+                    task_log.set_build_status(BuildStatus::Success);
+                } else {
+                    task_log.set_build_status(BuildStatus::Failed);
+                }
+
+                task_log.set_build_time_now();
+            }
+
+            Action::Install => {
+                if r.is_ok() {
+                    task_log.set_install_status(InstallStatus::Success);
+                } else {
+                    task_log.set_install_status(InstallStatus::Failed);
+                }
+            }
+
+            Action::Clean(_) => {
+                task_log.clean_build_status();
+                task_log.clean_install_status();
+            }
+
+            _ => {}
+        }
+
+        self.task_data_dir
+            .save_task_log(&task_log)
+            .expect("Failed to save task log");
+    }
+
+    fn do_execute(&mut self) -> Result<(), ExecutorError> {
         // 准备本地环境变量
         self.prepare_local_env()?;
 
@@ -118,12 +167,22 @@ impl Executor {
                 error!("Unsupported action: {:?}", self.action);
             }
         }
-        info!("Task {} finished", self.entity.task().name_version());
+
         return Ok(());
     }
 
     /// # 执行build操作
     fn build(&mut self) -> Result<(), ExecutorError> {
+        if let Some(status) = self.task_log().build_status() {
+            if *status == BuildStatus::Success && self.entity.task().build_once {
+                info!(
+                    "Task {} has been built successfully, skip build.",
+                    self.entity.task().name_version()
+                );
+                return Ok(());
+            }
+        }
+
         self.mv_target_to_tmp()?;
 
         // 确认源文件就绪
@@ -146,6 +205,16 @@ impl Executor {
 
     /// # 执行安装操作，把构建结果安装到DragonOS
     fn install(&self) -> Result<(), ExecutorError> {
+        if let Some(status) = self.task_log().install_status() {
+            if *status == InstallStatus::Success && self.entity.task().install_once {
+                info!(
+                    "Task {} has been installed successfully, skip install.",
+                    self.entity.task().name_version()
+                );
+                return Ok(());
+            }
+        }
+
         let binding = self.entity.task();
         let in_dragonos_path = binding.install.in_dragonos_path.as_ref();
         // 如果没有指定安装路径，则不执行安装
@@ -276,6 +345,10 @@ impl Executor {
             return local_path;
         }
         return self.source_dir.as_ref().unwrap().path.clone();
+    }
+
+    fn task_log(&self) -> TaskLog {
+        return self.task_data_dir.task_log();
     }
 
     /// 为任务创建命令

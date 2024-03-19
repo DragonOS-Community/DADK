@@ -47,7 +47,7 @@ impl FileUtils {
     /// 递归地复制给定目录下所有文件到另一个文件夹中
     pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
         let mut cmd = Command::new("cp");
-        cmd.arg("-rf").arg("./").arg(dst);
+        cmd.arg("-r").arg("-f").arg("./").arg(dst);
 
         cmd.current_dir(src);
 

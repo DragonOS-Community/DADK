@@ -3,7 +3,10 @@ use std::{path::PathBuf, sync::Arc};
 use log::info;
 
 use crate::{
-    parser::task::{CodeSource, DADKTask, TaskType},
+    parser::{
+        task::{CodeSource, DADKTask, TaskType},
+        task_log::TaskLog,
+    },
     scheduler::SchedEntity,
     utils::lazy_init::Lazy,
 };
@@ -38,7 +41,7 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
             }
             let cwd = cwd.unwrap();
 
-            cache_root = format!("{}/.cache", cwd);
+            cache_root = format!("{}/dadk_cache", cwd);
         }
     } else {
         // 如果有设置缓存根目录，则使用设置的值
@@ -77,8 +80,12 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum CacheDirType {
+    /// 构建缓存目录
     Build,
+    /// 源码缓存目录
     Source,
+    /// 每个任务执行数据缓存目录
+    TaskData,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +123,13 @@ impl CacheDir {
             }
             CacheDirType::Source => {
                 format!("{}/source/{}", cache_root.to_str().unwrap(), name_version)
+            }
+            CacheDirType::TaskData => {
+                format!(
+                    "{}/task_data/{}",
+                    cache_root.to_str().unwrap(),
+                    name_version
+                )
             }
         };
 
@@ -207,6 +221,39 @@ impl CacheDir {
         if path.exists() {
             std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e))?;
         }
+        return Ok(());
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskDataDir {
+    dir: CacheDir,
+}
+
+impl TaskDataDir {
+    const TASK_LOG_FILE_NAME: &'static str = "task_log.toml";
+    pub fn new(entity: Arc<SchedEntity>) -> Result<Self, ExecutorError> {
+        let dir = CacheDir::new(entity.clone(), CacheDirType::TaskData)?;
+        return Ok(Self { dir });
+    }
+
+    /// # 获取任务日志
+    pub fn task_log(&self) -> TaskLog {
+        let path = self.dir.path.join(Self::TASK_LOG_FILE_NAME);
+        if path.exists() {
+            let content = std::fs::read_to_string(&path).unwrap();
+            let task_log: TaskLog = toml::from_str(&content).unwrap();
+            return task_log;
+        } else {
+            return TaskLog::new();
+        }
+    }
+
+    /// # 设置任务日志
+    pub fn save_task_log(&self, task_log: &TaskLog) -> Result<(), ExecutorError> {
+        let path = self.dir.path.join(Self::TASK_LOG_FILE_NAME);
+        let content = toml::to_string(task_log).unwrap();
+        std::fs::write(&path, content).map_err(|e| ExecutorError::IoError(e))?;
         return Ok(());
     }
 }

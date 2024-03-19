@@ -36,6 +36,14 @@ pub struct DADKTask {
     pub clean: CleanConfig,
     /// 环境变量
     pub envs: Option<Vec<TaskEnv>>,
+
+    /// (可选) 是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果。
+    #[serde(default)]
+    pub build_once: bool,
+
+    /// (可选) 是否只安装一次，如果为true，DADK会在安装成功后，不再重复安装。
+    #[serde(default)]
+    pub install_once: bool,
 }
 
 impl DADKTask {
@@ -51,6 +59,8 @@ impl DADKTask {
         install: InstallConfig,
         clean: CleanConfig,
         envs: Option<Vec<TaskEnv>>,
+        build_once: bool,
+        install_once: bool,
     ) -> Self {
         Self {
             name,
@@ -63,6 +73,8 @@ impl DADKTask {
             install,
             clean,
             envs,
+            build_once,
+            install_once,
         }
     }
 

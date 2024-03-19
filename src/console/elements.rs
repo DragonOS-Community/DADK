@@ -373,3 +373,29 @@ impl<T: Debug> VecInput<T> {
         return Ok(&self.results);
     }
 }
+
+#[derive(Debug)]
+pub struct BoolInput {
+    input: Input,
+}
+impl BoolInput {
+    pub fn new(mut pre_tips: String, post_tips: Option<String>) -> Self {
+        pre_tips.push_str(" (y/n)");
+        Self {
+            input: Input::new(Some(pre_tips), post_tips),
+        }
+    }
+}
+
+impl InputFunc<bool> for BoolInput {
+    fn input(&mut self) -> Result<bool, ConsoleError> {
+        let x = self.input.input()?;
+
+        let x = x.trim().to_lowercase();
+        if x.starts_with("y") {
+            return Ok(true);
+        } else {
+            return Ok(false);
+        }
+    }
+}

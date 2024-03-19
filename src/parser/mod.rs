@@ -21,6 +21,7 @@
 //!     "build": {构建配置（该部分详见BuildConfig的文档）},
 //!     "install": {安装配置（该部分详见InstallConfig的文档）},
 //!     "envs" : [{ "key": "环境变量名", "value": "环境变量值" }]
+//!     "build_once": (可选) 是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果。
 //! }
 use std::{
     fmt::Debug,
@@ -32,6 +33,7 @@ use log::{debug, error, info};
 
 use self::task::DADKTask;
 pub mod task;
+pub mod task_log;
 
 /// # 配置解析器
 ///
