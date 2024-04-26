@@ -72,6 +72,7 @@ pub trait InputFunc<T: Debug + Sized> {
     /// # 读取用户输入，最多重试指定次数
     ///
     /// 如果重试次数超过指定次数，则返回错误Err(ConsoleError::RetryLimitExceeded)
+    #[allow(dead_code)]
     fn input_with_retry(&mut self, retry: usize) -> Result<T, ConsoleError> {
         for _ in 0..retry {
             let task_type = self.input();

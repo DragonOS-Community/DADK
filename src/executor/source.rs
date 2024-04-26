@@ -17,7 +17,7 @@ use super::cache::CacheDir;
 /// # Git源
 ///
 /// 从Git仓库获取源码
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GitSource {
     /// Git仓库地址
     url: String,
@@ -448,7 +448,7 @@ impl GitSource {
 }
 
 /// # 本地源
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LocalSource {
     /// 本地目录/文件的路径
     path: PathBuf,
@@ -486,7 +486,7 @@ impl LocalSource {
 }
 
 /// # 在线压缩包源
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ArchiveSource {
     /// 压缩包的URL
     url: String,

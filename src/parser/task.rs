@@ -206,7 +206,7 @@ impl DADKTask {
 }
 
 /// @brief 构建配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BuildConfig {
     /// 构建命令
     pub build_command: Option<String>,
@@ -229,7 +229,7 @@ impl BuildConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InstallConfig {
     /// 安装到DragonOS内的目录
     pub in_dragonos_path: Option<PathBuf>,
@@ -255,7 +255,7 @@ impl InstallConfig {
 }
 
 /// # 清理配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CleanConfig {
     /// 清理命令
     pub clean_command: Option<String>,
@@ -312,7 +312,7 @@ impl Dependency {
 }
 
 /// # 任务类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TaskType {
     /// 从源码构建
     BuildFromSource(CodeSource),
@@ -337,7 +337,7 @@ impl TaskType {
 }
 
 /// # 代码源
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CodeSource {
     /// 从Git仓库获取
     Git(GitSource),
@@ -365,7 +365,7 @@ impl CodeSource {
 }
 
 /// # 预编译包源
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PrebuiltSource {
     /// 从在线压缩包获取
     Archive(ArchiveSource),

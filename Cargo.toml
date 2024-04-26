@@ -8,6 +8,11 @@ license = "GPL-2.0-only"
 repository = "https://github.com/DragonOS-Community/DADK.git"
 readme = "README.md"
 
+[workspace]
+members = [
+    "crates/test_base",
+]
+
 [[bin]]
 name = "dadk"
 path = "src/main.rs"
@@ -27,3 +32,7 @@ serde_json = "1.0.96"
 simple_logger = { version = "4.1.0", features = ["stderr"] }
 toml = "0.8.12"
 zip = "0.6"
+
+[dev-dependencies]
+test_base = { path = "crates/test_base" }
+
