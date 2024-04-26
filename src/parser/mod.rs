@@ -258,13 +258,12 @@ mod tests {
             LocalSource::new(PathBuf::from("tests/data/apps/app_normal")),
         ));
 
-        assert_eq!(
-            result.task_type, expected_task_type,
-        );
+        assert_eq!(result.task_type, expected_task_type,);
 
         assert_eq!(result.depends.len(), 0);
 
-        let expected_build_config: BuildConfig = BuildConfig::new(Some("bash build.sh".to_string()));
+        let expected_build_config: BuildConfig =
+            BuildConfig::new(Some("bash build.sh".to_string()));
         assert_eq!(result.build, expected_build_config);
 
         let expected_install_config = task::InstallConfig::new(Some(PathBuf::from("/")));
