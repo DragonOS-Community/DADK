@@ -3,7 +3,7 @@ use std::{fmt::Display, str::FromStr};
 use clap::{Args, Subcommand};
 
 /// 清理缓存的级别
-#[derive(Debug, Args, Clone, Copy)]
+#[derive(Debug, Args, Clone, Copy, PartialEq, Eq)]
 pub struct CleanArg {
     #[arg(default_value = "src")]
     /// 清理缓存的级别
@@ -18,7 +18,7 @@ pub struct CleanArg {
     pub level: CleanLevel,
 }
 
-#[derive(Debug, Subcommand, Clone, Copy)]
+#[derive(Debug, Subcommand, Clone, Copy, PartialEq, Eq)]
 pub enum CleanLevel {
     /// 清理所有缓存
     All,

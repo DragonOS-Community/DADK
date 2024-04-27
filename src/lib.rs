@@ -103,11 +103,12 @@ use simple_logger::SimpleLogger;
 
 use crate::{
     console::{interactive::InteractiveConsole, CommandLineArgs},
-    executor::cache::cache_root_init,
-    scheduler::{task_deque::TASK_DEQUE, Scheduler},
+    context::DadkExecuteContextBuilder,
+    scheduler::Scheduler,
 };
 
 mod console;
+mod context;
 mod executor;
 pub mod parser;
 mod scheduler;
@@ -121,34 +122,45 @@ pub fn dadk_main() {
     let args = CommandLineArgs::parse();
 
     info!("DADK run with args: {:?}", &args);
+
+    let context = DadkExecuteContextBuilder::default()
+        .sysroot_dir(args.dragonos_dir)
+        .config_dir(args.config_dir)
+        .action(args.action)
+        .thread_num(args.thread)
+        .cache_dir(args.cache_dir)
+        .build()
+        .expect("Failed to build execute context");
+
+    context.init();
     // DragonOS sysroot在主机上的路径
-    let dragonos_dir = args.dragonos_dir.clone();
-    let config_dir = args.config_dir.clone();
-    let action = args.action;
-    let thread = args.thread;
+
     info!(
         "DragonOS sysroot dir: {}",
-        dragonos_dir
-            .as_ref()
+        context
+            .sysroot_dir()
             .map_or_else(|| "None".to_string(), |d| d.display().to_string())
     );
     info!(
         "Config dir: {}",
-        config_dir
-            .as_ref()
+        context
+            .config_dir()
             .map_or_else(|| "None".to_string(), |d| d.display().to_string())
     );
-    info!("Action: {:?}", action);
+    info!("Action: {:?}", context.action());
     info!(
         "Thread num: {}",
-        thread
-            .as_ref()
-            .map_or_else(|| "None".to_string(), |d| d.to_string())
+        context.thread_num().map_or_else(|| 0, |t| t)
     );
 
-    match action {
+    match context.action() {
         console::Action::New => {
-            let r = InteractiveConsole::new(dragonos_dir.clone(), config_dir.clone(), action).run();
+            let r = InteractiveConsole::new(
+                context.sysroot_dir().cloned(),
+                context.config_dir().cloned(),
+                *context.action(),
+            )
+            .run();
             if r.is_err() {
                 error!("Failed to run interactive console: {:?}", r.unwrap_err());
                 exit(1);
@@ -158,28 +170,7 @@ pub fn dadk_main() {
         _ => {}
     }
 
-    if let Some(thread) = thread {
-        TASK_DEQUE.lock().unwrap().set_thread(thread);
-    }
-
-    // 初始化缓存目录
-    let r = cache_root_init(args.cache_dir);
-    if r.is_err() {
-        error!("Failed to init cache root: {:?}", r.unwrap_err());
-        exit(1);
-    }
-
-    let config_dir = args.config_dir.unwrap_or_else(|| {
-        error!("Config dir not specified");
-        exit(1);
-    });
-
-    let dragonos_dir = args.dragonos_dir.unwrap_or_else(|| {
-        error!("DragonOS sysroot dir not specified");
-        exit(1);
-    });
-
-    let mut parser = parser::Parser::new(config_dir);
+    let mut parser = parser::Parser::new(context.config_dir().unwrap().clone());
     let r = parser.parse();
     if r.is_err() {
         exit(1);
@@ -187,7 +178,11 @@ pub fn dadk_main() {
     let tasks: Vec<(PathBuf, DADKTask)> = r.unwrap();
     // info!("Parsed tasks: {:?}", tasks);
 
-    let scheduler = Scheduler::new(dragonos_dir, action, tasks);
+    let scheduler = Scheduler::new(
+        context.sysroot_dir().cloned().unwrap(),
+        *context.action(),
+        tasks,
+    );
     if scheduler.is_err() {
         exit(1);
     }

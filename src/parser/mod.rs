@@ -200,7 +200,7 @@ impl Parser {
     ///
     /// * `Ok(DADKTask)` - 生成好的任务
     /// * `Err(ParserError)` - 解析错误
-    fn parse_config_file(&self, config_file: &PathBuf) -> Result<DADKTask, ParserError> {
+    pub(super) fn parse_config_file(&self, config_file: &PathBuf) -> Result<DADKTask, ParserError> {
         let content = std::fs::read_to_string(config_file).map_err(|e| ParserError {
             config_file: Some(config_file.clone()),
             error: InnerParserError::IoError(e),
