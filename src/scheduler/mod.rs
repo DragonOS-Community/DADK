@@ -14,6 +14,7 @@ use log::{error, info};
 
 use crate::{
     console::Action,
+    context::DadkExecuteContext,
     executor::{target::Target, Executor},
     parser::task::DADKTask,
 };
@@ -21,6 +22,8 @@ use crate::{
 use self::task_deque::TASK_DEQUE;
 
 pub mod task_deque;
+#[cfg(test)]
+mod tests;
 
 lazy_static! {
     // 线程id与任务实体id映射表
@@ -262,10 +265,14 @@ pub struct Scheduler {
     action: Action,
     /// 调度实体列表
     target: SchedEntities,
+    /// dadk执行的上下文
+    context: Arc<DadkExecuteContext>,
 }
 
 pub enum SchedulerError {
     TaskError(String),
+    /// 不是当前正在编译的目标架构
+    InvalidTargetArch(String),
     DependencyNotFound(Arc<SchedEntity>, String),
     RunError(String),
 }
@@ -288,12 +295,16 @@ impl Debug for SchedulerError {
             SchedulerError::RunError(msg) => {
                 write!(f, "RunError: {}", msg)
             }
+            SchedulerError::InvalidTargetArch(msg) => {
+                write!(f, "InvalidTargetArch: {}", msg)
+            }
         }
     }
 }
 
 impl Scheduler {
     pub fn new(
+        context: Arc<DadkExecuteContext>,
         dragonos_dir: PathBuf,
         action: Action,
         tasks: Vec<(PathBuf, DADKTask)>,
@@ -304,6 +315,7 @@ impl Scheduler {
             dragonos_dir,
             action,
             target: entities,
+            context,
         };
 
         let r = scheduler.add_tasks(tasks);
@@ -320,10 +332,21 @@ impl Scheduler {
     /// 添加任务到调度器中，如果任务已经存在，则返回错误
     pub fn add_tasks(&mut self, tasks: Vec<(PathBuf, DADKTask)>) -> Result<(), SchedulerError> {
         for task in tasks {
-            self.add_task(task.0, task.1)?;
+            let e = self.add_task(task.0, task.1);
+            if e.is_err() {
+                if let Err(SchedulerError::InvalidTargetArch(_)) = &e {
+                    continue;
+                }
+                e?;
+            }
         }
 
         return Ok(());
+    }
+
+    /// # 任务是否匹配当前目标架构
+    pub fn task_arch_matched(&self, task: &DADKTask) -> bool {
+        task.target_arch.contains(self.context.target_arch())
     }
 
     /// # 添加一个任务
@@ -334,6 +357,14 @@ impl Scheduler {
         path: PathBuf,
         task: DADKTask,
     ) -> Result<Arc<SchedEntity>, SchedulerError> {
+        if !self.task_arch_matched(&task) {
+            return Err(SchedulerError::InvalidTargetArch(format!(
+                "Task {} is not for target arch: {:?}",
+                task.name_version(),
+                self.context.target_arch()
+            )));
+        }
+
         let id: i32 = self.generate_task_id();
         let indegree: usize = 0;
         let children = Vec::new();
@@ -411,7 +442,7 @@ impl Scheduler {
     /// # 执行调度器中的所有任务
     pub fn run(&self) -> Result<(), SchedulerError> {
         // 准备全局环境变量
-        crate::executor::prepare_env(&self.target)
+        crate::executor::prepare_env(&self.target, &self.context)
             .map_err(|e| SchedulerError::RunError(format!("{:?}", e)))?;
 
         match self.action {

@@ -10,6 +10,7 @@ use log::{debug, error, info, warn};
 
 use crate::{
     console::{clean::CleanLevel, Action},
+    context::DadkExecuteContext,
     executor::cache::CacheDir,
     parser::{
         task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
@@ -24,6 +25,8 @@ use self::cache::{CacheDirType, TaskDataDir};
 pub mod cache;
 pub mod source;
 pub mod target;
+#[cfg(test)]
+mod tests;
 
 lazy_static! {
     // 全局环境变量的列表
@@ -611,10 +614,24 @@ pub enum ExecutorError {
 }
 
 /// # 准备全局环境变量
-pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> {
+pub fn prepare_env(
+    sched_entities: &SchedEntities,
+    execute_ctx: &Arc<DadkExecuteContext>,
+) -> Result<(), ExecutorError> {
     info!("Preparing environment variables...");
-    // 获取当前全局环境变量列表
-    let mut env_list = ENV_LIST.write().unwrap();
+    let env_list = create_global_env_list(sched_entities, execute_ctx)?;
+    // 写入全局环境变量列表
+    let mut global_env_list = ENV_LIST.write().unwrap();
+    *global_env_list = env_list;
+    return Ok(());
+}
+
+/// # 创建全局环境变量列表
+fn create_global_env_list(
+    sched_entities: &SchedEntities,
+    execute_ctx: &Arc<DadkExecuteContext>,
+) -> Result<EnvMap, ExecutorError> {
+    let mut env_list = EnvMap::new();
     let envs: Vars = std::env::vars();
     env_list.add_vars(envs);
 
@@ -640,99 +657,9 @@ pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> 
         }
     }
 
-    // 查看环境变量列表
-    // debug!("Environment variables:");
+    // 创建ARCH环境变量
+    let target_arch = execute_ctx.target_arch();
+    env_list.add(EnvVar::new("ARCH".to_string(), (*target_arch).into()));
 
-    // for (key, value) in env_list.envs.iter() {
-    //     debug!("{}: {}", key, value.value);
-    // }
-
-    return Ok(());
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use test_base::test_context::{self as test_context, test_context};
-
-    use crate::{
-        context::{DadkExecuteContextTestBuildV1, TestContextExt},
-        executor::Executor,
-        parser::Parser,
-        scheduler::Scheduler,
-    };
-
-    fn setup_executor<T: TestContextExt>(config_file: PathBuf, ctx: &T) -> Executor {
-        let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
-        assert!(task.is_ok(), "parse error: {:?}", task);
-        let scheduler = Scheduler::new(
-            ctx.base_context().fake_dragonos_sysroot(),
-            *ctx.execute_context().action(),
-            vec![],
-        );
-
-        assert!(scheduler.is_ok(), "Create scheduler error: {:?}", scheduler);
-
-        let mut scheduler = scheduler.unwrap();
-
-        let entity = scheduler.add_task(config_file, task.unwrap());
-
-        assert!(entity.is_ok(), "Add task error: {:?}", entity);
-        let entity = entity.unwrap();
-        let executor = Executor::new(
-            entity.clone(),
-            *ctx.execute_context().action(),
-            ctx.base_context().fake_dragonos_sysroot(),
-        );
-
-        assert!(executor.is_ok(), "Create executor error: {:?}", executor);
-
-        let executor = executor.unwrap();
-        return executor;
-    }
-
-    /// 测试能否正确设置本地环境变量
-    #[test_context(DadkExecuteContextTestBuildV1)]
-    #[test]
-    fn set_local_env(ctx: &DadkExecuteContextTestBuildV1) {
-        let config_file_path = ctx
-            .base_context()
-            .config_v1_dir()
-            .join("app_normal_with_env_0_1_0.dadk");
-        let mut executor = setup_executor(config_file_path, ctx);
-
-        let r = executor.prepare_local_env();
-        assert!(r.is_ok(), "Prepare local env error: {:?}", r);
-        assert_ne!(executor.local_envs.envs.len(), 0);
-
-        assert!(executor.local_envs.get("DADK_CURRENT_BUILD_DIR").is_some());
-        assert!(executor.local_envs.get("CC").is_some());
-        assert_eq!(executor.local_envs.get("CC").unwrap().value, "abc-gcc");
-
-        let x = executor.execute();
-        assert!(x.is_ok(), "Execute error: {:?}", x);
-    }
-
-    /// 测试执行错误时，能否感知到错误
-    #[test_context(DadkExecuteContextTestBuildV1)]
-    #[test]
-    fn execute_should_capture_error(ctx: &DadkExecuteContextTestBuildV1) {
-        let config_file_path = ctx
-            .base_context()
-            .config_v1_dir()
-            .join("app_normal_with_env_fail_0_1_0.dadk");
-        let mut executor = setup_executor(config_file_path, ctx);
-
-        let r = executor.prepare_local_env();
-        assert!(r.is_ok(), "Prepare local env error: {:?}", r);
-        assert_ne!(executor.local_envs.envs.len(), 0);
-
-        assert!(executor.local_envs.get("DADK_CURRENT_BUILD_DIR").is_some());
-        assert!(executor.local_envs.get("CC").is_some());
-        assert_eq!(executor.local_envs.get("CC").unwrap().value, "abc-gcc1");
-
-        let x = executor.execute();
-        assert!(x.is_err(), "Executor cannot catch error when build error");
-    }
+    return Ok(env_list);
 }

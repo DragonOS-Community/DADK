@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
 
@@ -44,6 +44,9 @@ pub struct DADKTask {
     /// (可选) 是否只安装一次，如果为true，DADK会在安装成功后，不再重复安装。
     #[serde(default)]
     pub install_once: bool,
+
+    #[serde(default = "DADKTask::default_target_arch_vec")]
+    pub target_arch: Vec<TargetArch>,
 }
 
 impl DADKTask {
@@ -61,6 +64,7 @@ impl DADKTask {
         envs: Option<Vec<TaskEnv>>,
         build_once: bool,
         install_once: bool,
+        target_arch: Option<Vec<TargetArch>>,
     ) -> Self {
         Self {
             name,
@@ -75,7 +79,20 @@ impl DADKTask {
             envs,
             build_once,
             install_once,
+            target_arch: target_arch.unwrap_or_else(Self::default_target_arch_vec),
         }
+    }
+
+    /// 默认的目标处理器架构
+    ///
+    /// 从环境变量`ARCH`中获取，如果没有设置，则默认为`x86_64`
+    pub fn default_target_arch() -> TargetArch {
+        let s = std::env::var("ARCH").unwrap_or("x86_64".to_string());
+        return TargetArch::try_from(s.as_str()).unwrap();
+    }
+
+    fn default_target_arch_vec() -> Vec<TargetArch> {
+        vec![Self::default_target_arch()]
     }
 
     pub fn validate(&mut self) -> Result<(), String> {
@@ -92,6 +109,7 @@ impl DADKTask {
         self.clean.validate()?;
         self.validate_depends()?;
         self.validate_envs()?;
+        self.validate_target_arch()?;
 
         return Ok(());
     }
@@ -129,6 +147,13 @@ impl DADKTask {
             for env in envs {
                 env.validate()?;
             }
+        }
+        return Ok(());
+    }
+
+    fn validate_target_arch(&self) -> Result<(), String> {
+        if self.target_arch.is_empty() {
+            return Err("target_arch is empty".to_string());
         }
         return Ok(());
     }
@@ -422,5 +447,85 @@ impl TaskEnv {
             return Err("Env: key is empty".to_string());
         }
         return Ok(());
+    }
+}
+
+/// 目标处理器架构
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetArch {
+    Aarch64,
+    X86_64,
+    RiscV64,
+    RiscV32,
+}
+
+impl TargetArch {
+    /// 期望的目标处理器架构（如果修改了枚举，那一定要修改这里）
+    pub const EXPECTED: [&'static str; 4] = ["aarch64", "x86_64", "riscv64", "riscv32"];
+}
+
+impl Default for TargetArch {
+    fn default() -> Self {
+        TargetArch::X86_64
+    }
+}
+
+impl TryFrom<&str> for TargetArch {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "aarch64" => Ok(TargetArch::Aarch64),
+            "x86_64" => Ok(TargetArch::X86_64),
+            "riscv64" => Ok(TargetArch::RiscV64),
+            "riscv32" => Ok(TargetArch::RiscV32),
+            _ => Err(format!("Unknown target arch: {}", value)),
+        }
+    }
+}
+
+impl Into<&str> for TargetArch {
+    fn into(self) -> &'static str {
+        match self {
+            TargetArch::Aarch64 => "aarch64",
+            TargetArch::X86_64 => "x86_64",
+            TargetArch::RiscV64 => "riscv64",
+            TargetArch::RiscV32 => "riscv32",
+        }
+    }
+}
+
+impl Into<String> for TargetArch {
+    fn into(self) -> String {
+        let x: &str = self.into();
+        x.to_string()
+    }
+}
+
+impl<'de> Deserialize<'de> for TargetArch {
+    fn deserialize<D>(deserializer: D) -> Result<TargetArch, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        let r = TargetArch::try_from(s.as_str());
+        match r {
+            Ok(v) => Ok(v),
+            Err(_) => Err(serde::de::Error::invalid_value(
+                serde::de::Unexpected::Str(s.as_str()),
+                &format!("Expected one of {:?}", TargetArch::EXPECTED).as_str(),
+            )),
+        }
+    }
+}
+
+impl Serialize for TargetArch {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let string: String = Into::into(*self);
+        serializer.serialize_str(string.as_str())
     }
 }
