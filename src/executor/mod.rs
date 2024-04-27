@@ -99,9 +99,9 @@ impl Executor {
         info!("Execute task: {}", self.entity.task().name_version());
 
         let r = self.do_execute();
-        self.save_task_data(r);
+        self.save_task_data(r.clone());
         info!("Task {} finished", self.entity.task().name_version());
-        return Ok(());
+        return r;
     }
 
     /// # 保存任务数据
@@ -479,10 +479,13 @@ impl Executor {
         let mut child = command
             .stdin(Stdio::inherit())
             .spawn()
-            .map_err(|e| ExecutorError::IoError(e))?;
+            .map_err(|e| ExecutorError::IoError(e.to_string()))?;
 
         // 等待子进程结束
-        let r = child.wait().map_err(|e| ExecutorError::IoError(e));
+        let r = child
+            .wait()
+            .map_err(|e| ExecutorError::IoError(e.to_string()));
+        debug!("Command finished: {:?}", r);
         if r.is_ok() {
             let r = r.unwrap();
             if r.success() {
@@ -594,11 +597,11 @@ impl EnvVar {
 
 /// # 任务执行器错误枚举
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExecutorError {
     /// 准备执行环境错误
     PrepareEnvError(String),
-    IoError(std::io::Error),
+    IoError(String),
     /// 构建执行错误
     TaskFailed(String),
     /// 安装错误
@@ -645,4 +648,91 @@ pub fn prepare_env(sched_entities: &SchedEntities) -> Result<(), ExecutorError> 
     // }
 
     return Ok(());
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use test_base::test_context::{self as test_context, test_context};
+
+    use crate::{
+        context::{DadkExecuteContextTestBuildV1, TestContextExt},
+        executor::Executor,
+        parser::Parser,
+        scheduler::Scheduler,
+    };
+
+    fn setup_executor<T: TestContextExt>(config_file: PathBuf, ctx: &T) -> Executor {
+        let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
+        assert!(task.is_ok(), "parse error: {:?}", task);
+        let scheduler = Scheduler::new(
+            ctx.base_context().fake_dragonos_sysroot(),
+            *ctx.execute_context().action(),
+            vec![],
+        );
+
+        assert!(scheduler.is_ok(), "Create scheduler error: {:?}", scheduler);
+
+        let mut scheduler = scheduler.unwrap();
+
+        let entity = scheduler.add_task(config_file, task.unwrap());
+
+        assert!(entity.is_ok(), "Add task error: {:?}", entity);
+        let entity = entity.unwrap();
+        let executor = Executor::new(
+            entity.clone(),
+            *ctx.execute_context().action(),
+            ctx.base_context().fake_dragonos_sysroot(),
+        );
+
+        assert!(executor.is_ok(), "Create executor error: {:?}", executor);
+
+        let executor = executor.unwrap();
+        return executor;
+    }
+
+    /// 测试能否正确设置本地环境变量
+    #[test_context(DadkExecuteContextTestBuildV1)]
+    #[test]
+    fn set_local_env(ctx: &DadkExecuteContextTestBuildV1) {
+        let config_file_path = ctx
+            .base_context()
+            .config_v1_dir()
+            .join("app_normal_with_env_0_1_0.dadk");
+        let mut executor = setup_executor(config_file_path, ctx);
+
+        let r = executor.prepare_local_env();
+        assert!(r.is_ok(), "Prepare local env error: {:?}", r);
+        assert_ne!(executor.local_envs.envs.len(), 0);
+
+        assert!(executor.local_envs.get("DADK_CURRENT_BUILD_DIR").is_some());
+        assert!(executor.local_envs.get("CC").is_some());
+        assert_eq!(executor.local_envs.get("CC").unwrap().value, "abc-gcc");
+
+        let x = executor.execute();
+        assert!(x.is_ok(), "Execute error: {:?}", x);
+    }
+
+    /// 测试执行错误时，能否感知到错误
+    #[test_context(DadkExecuteContextTestBuildV1)]
+    #[test]
+    fn execute_should_capture_error(ctx: &DadkExecuteContextTestBuildV1) {
+        let config_file_path = ctx
+            .base_context()
+            .config_v1_dir()
+            .join("app_normal_with_env_fail_0_1_0.dadk");
+        let mut executor = setup_executor(config_file_path, ctx);
+
+        let r = executor.prepare_local_env();
+        assert!(r.is_ok(), "Prepare local env error: {:?}", r);
+        assert_ne!(executor.local_envs.envs.len(), 0);
+
+        assert!(executor.local_envs.get("DADK_CURRENT_BUILD_DIR").is_some());
+        assert!(executor.local_envs.get("CC").is_some());
+        assert_eq!(executor.local_envs.get("CC").unwrap().value, "abc-gcc1");
+
+        let x = executor.execute();
+        assert!(x.is_err(), "Executor cannot catch error when build error");
+    }
 }

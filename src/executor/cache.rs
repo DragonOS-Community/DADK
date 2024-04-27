@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Once},
+};
 
 use log::info;
 
@@ -30,14 +33,17 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
         } else {
             // 如果没有设置环境变量，则使用默认值
             // 默认值为当前目录下的.cache目录
-            let cwd = std::env::current_dir().map_err(|e| ExecutorError::IoError(e))?;
+            let cwd = std::env::current_dir().map_err(|e| ExecutorError::IoError(e.to_string()))?;
             let cwd = cwd.to_str();
 
             if cwd.is_none() {
-                return Err(ExecutorError::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Current dir is not a valid unicode string",
-                )));
+                return Err(ExecutorError::IoError(
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Current dir is not a valid unicode string",
+                    )
+                    .to_string(),
+                ));
             }
             let cwd = cwd.unwrap();
 
@@ -46,12 +52,13 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
     } else {
         // 如果有设置缓存根目录，则使用设置的值
         let path = path.unwrap();
-        let x = path
-            .to_str()
-            .ok_or(ExecutorError::IoError(std::io::Error::new(
+        let x = path.to_str().ok_or(ExecutorError::IoError(
+            std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Cache root dir is not a valid unicode string",
-            )))?;
+            )
+            .to_string(),
+        ))?;
         cache_root = x.to_string();
     }
 
@@ -60,17 +67,21 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
     // 如果缓存根目录不存在，则创建
     if !cache_root.exists() {
         info!("Cache root dir not exists, create it: {:?}", cache_root);
-        std::fs::create_dir_all(&cache_root).map_err(|e| ExecutorError::IoError(e))?;
+        std::fs::create_dir_all(&cache_root).map_err(|e| ExecutorError::IoError(e.to_string()))?;
     } else if !cache_root.is_dir() {
         // 如果缓存根目录不是目录，则报错
-        return Err(ExecutorError::IoError(std::io::Error::new(
-            std::io::ErrorKind::NotADirectory,
-            format!("Cache root dir is not a directory: {:?}", cache_root),
-        )));
+        return Err(ExecutorError::IoError(
+            std::io::Error::new(
+                std::io::ErrorKind::NotADirectory,
+                format!("Cache root dir is not a directory: {:?}", cache_root),
+            )
+            .to_string(),
+        ));
     }
 
     // 初始化缓存根目录
-    CACHE_ROOT.init(cache_root);
+    static CACHE_ROOT_INIT_ONCE: Once = Once::new();
+    CACHE_ROOT_INIT_ONCE.call_once(|| CACHE_ROOT.init(cache_root));
 
     // 设置环境变量
     std::env::set_var("DADK_CACHE_ROOT", CACHE_ROOT.get().to_str().unwrap());
@@ -186,14 +197,18 @@ impl CacheDir {
     pub fn create(&self) -> Result<(), ExecutorError> {
         if !self.path.exists() {
             info!("Cache dir not exists, create it: {:?}", self.path);
-            std::fs::create_dir_all(&self.path).map_err(|e| ExecutorError::IoError(e))?;
+            std::fs::create_dir_all(&self.path)
+                .map_err(|e| ExecutorError::IoError(e.to_string()))?;
             info!("Cache dir: [{:?}] created.", self.path);
         } else if !self.path.is_dir() {
             // 如果路径类别不是目录，则报错
-            return Err(ExecutorError::IoError(std::io::Error::new(
-                std::io::ErrorKind::NotADirectory,
-                format!("Cache dir is not a directory: {:?}", self.path),
-            )));
+            return Err(ExecutorError::IoError(
+                std::io::Error::new(
+                    std::io::ErrorKind::NotADirectory,
+                    format!("Cache dir is not a directory: {:?}", self.path),
+                )
+                .to_string(),
+            ));
         }
 
         return Ok(());
@@ -204,7 +219,7 @@ impl CacheDir {
         let x = self
             .path
             .read_dir()
-            .map_err(|e| ExecutorError::IoError(e))?;
+            .map_err(|e| ExecutorError::IoError(e.to_string()))?;
         for _ in x {
             return Ok(false);
         }
@@ -219,7 +234,7 @@ impl CacheDir {
     pub fn remove_self_recursive(&self) -> Result<(), ExecutorError> {
         let path = &self.path;
         if path.exists() {
-            std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e))?;
+            std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e.to_string()))?;
         }
         return Ok(());
     }
@@ -253,7 +268,7 @@ impl TaskDataDir {
     pub fn save_task_log(&self, task_log: &TaskLog) -> Result<(), ExecutorError> {
         let path = self.dir.path.join(Self::TASK_LOG_FILE_NAME);
         let content = toml::to_string(task_log).unwrap();
-        std::fs::write(&path, content).map_err(|e| ExecutorError::IoError(e))?;
+        std::fs::write(&path, content).map_err(|e| ExecutorError::IoError(e.to_string()))?;
         return Ok(());
     }
 }

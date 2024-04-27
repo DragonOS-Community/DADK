@@ -329,7 +329,11 @@ impl Scheduler {
     /// # 添加一个任务
     ///
     /// 添加任务到调度器中，如果任务已经存在，则返回错误
-    pub fn add_task(&mut self, path: PathBuf, task: DADKTask) -> Result<(), SchedulerError> {
+    pub fn add_task(
+        &mut self,
+        path: PathBuf,
+        task: DADKTask,
+    ) -> Result<Arc<SchedEntity>, SchedulerError> {
         let id: i32 = self.generate_task_id();
         let indegree: usize = 0;
         let children = Vec::new();
@@ -362,7 +366,7 @@ impl Scheduler {
         self.target.add(entity.clone());
 
         info!("Task added: {}", entity.task().name_version());
-        return Ok(());
+        return Ok(entity);
     }
 
     fn generate_task_id(&self) -> i32 {

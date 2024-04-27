@@ -59,7 +59,7 @@ fn parse_check_dir_exists(path: &str) -> Result<PathBuf, String> {
 }
 
 /// @brief 要执行的操作
-#[derive(Debug, Subcommand, Clone, Copy)]
+#[derive(Debug, Subcommand, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     /// 构建所有项目
     Build,
