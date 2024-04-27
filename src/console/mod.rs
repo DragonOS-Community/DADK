@@ -20,6 +20,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use crate::parser::task::TargetArch;
+
 use self::clean::CleanArg;
 
 #[derive(Debug, Parser, Clone)]
@@ -43,6 +45,9 @@ pub struct CommandLineArgs {
     /// DADK任务并行线程数量
     #[arg(short, long)]
     pub thread: Option<usize>,
+
+    #[arg(long, value_parser = parse_target_arch)]
+    pub target_arch: Option<TargetArch>,
 }
 
 /// @brief 检查目录是否存在
@@ -56,6 +61,14 @@ fn parse_check_dir_exists(path: &str) -> Result<PathBuf, String> {
     }
 
     return Ok(path);
+}
+
+fn parse_target_arch(s: &str) -> Result<TargetArch, String> {
+    let x = TargetArch::try_from(s);
+    if x.is_err() {
+        return Err(format!("Invalid target arch: {}", s));
+    }
+    return Ok(x.unwrap());
 }
 
 /// @brief 要执行的操作

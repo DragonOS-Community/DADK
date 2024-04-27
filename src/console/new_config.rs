@@ -10,7 +10,7 @@ use crate::{
     },
     parser::task::{
         BuildConfig, CleanConfig, CodeSource, DADKTask, Dependency, InstallConfig, PrebuiltSource,
-        TaskEnv, TaskType,
+        TargetArch, TaskEnv, TaskType,
     },
 };
 
@@ -122,6 +122,9 @@ impl NewConfigCommand {
         let install_once = BoolInput::new("Install this task once?".to_string(), None).input()?;
         debug!("install_once: {:?}", install_once);
 
+        let target_arch = TargetArchInput::new().input()?;
+        debug!("target_arch: {:?}", target_arch);
+
         let mut dadk: DADKTask = DADKTask::new(
             name,
             version,
@@ -135,6 +138,7 @@ impl NewConfigCommand {
             task_env,
             build_once,
             install_once,
+            target_arch,
         );
 
         dadk.trim();
@@ -739,6 +743,62 @@ impl TaskEnvInputOne {
 
 impl InputFunc<TaskEnv> for TaskEnvInputOne {
     fn input(&mut self) -> Result<TaskEnv, ConsoleError> {
+        let env = self.input_one()?;
+        return Ok(env);
+    }
+}
+
+/// # 输入目标架构
+///
+/// 可选值参考：[TargetArch](crate::parser::task::TargetArch::EXPECTED)
+#[derive(Debug)]
+struct TargetArchInput;
+
+impl TargetArchInput {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl InputFunc<Option<Vec<TargetArch>>> for TargetArchInput {
+    fn input(&mut self) -> Result<Option<Vec<TargetArch>>, ConsoleError> {
+        const TIPS: &str = "Please configure the [ available target arch ] of the task:";
+        println!();
+        println!("{TIPS}");
+        let env_reader: Rc<RefCell<TargetArchInputOne>> =
+            Rc::new(RefCell::new(TargetArchInputOne::new()));
+        let mut vecinput: VecInput<TargetArch> = VecInput::new(Some(TIPS.to_string()), env_reader);
+        vecinput.input()?;
+        let result = vecinput.results()?.clone();
+
+        if result.is_empty() {
+            return Ok(None);
+        }
+
+        return Ok(Some(result));
+    }
+}
+
+#[derive(Debug)]
+struct TargetArchInputOne;
+
+impl TargetArchInputOne {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn input_one(&self) -> Result<TargetArch, ConsoleError> {
+        let s = Input::new(Some("Please input one target arch:".to_string()), None).input()?;
+
+        let target_arch = TargetArch::try_from(s.as_str()).map_err(|e| {
+            ConsoleError::InvalidInput(format!("Invalid target arch: {}", e.to_string()))
+        })?;
+        return Ok(target_arch);
+    }
+}
+
+impl InputFunc<TargetArch> for TargetArchInputOne {
+    fn input(&mut self) -> Result<TargetArch, ConsoleError> {
         let env = self.input_one()?;
         return Ok(env);
     }

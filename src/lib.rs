@@ -93,7 +93,10 @@ extern crate serde;
 extern crate serde_json;
 extern crate simple_logger;
 
-use std::{path::PathBuf, process::exit};
+#[cfg(test)]
+extern crate test_base;
+
+use std::{path::PathBuf, process::exit, sync::Arc};
 
 use clap::Parser;
 
@@ -131,8 +134,8 @@ pub fn dadk_main() {
         .cache_dir(args.cache_dir)
         .build()
         .expect("Failed to build execute context");
-
-    context.init();
+    let context = Arc::new(context);
+    context.init(context.clone());
     // DragonOS sysroot在主机上的路径
 
     info!(
@@ -179,6 +182,7 @@ pub fn dadk_main() {
     // info!("Parsed tasks: {:?}", tasks);
 
     let scheduler = Scheduler::new(
+        context.clone(),
         context.sysroot_dir().cloned().unwrap(),
         *context.action(),
         tasks,
