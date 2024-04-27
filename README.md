@@ -1,6 +1,8 @@
 # DADK - DragonOS Application Development Kit
 # DragonOS 应用开发工具
 
+[![codecov](https://codecov.io/gh/DragonOS-Community/DADK/graph/badge.svg?token=K3AYCACL8Z)](https://codecov.io/gh/DragonOS-Community/DADK)
+
 ## 简介
 
 DADK是一个用于开发DragonOS应用的工具包，设计目的是为了让开发者能够更加方便的开发DragonOS应用。
