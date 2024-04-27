@@ -46,6 +46,7 @@ pub struct CommandLineArgs {
     #[arg(short, long)]
     pub thread: Option<usize>,
 
+    /// 目标架构，可选： ["aarch64", "x86_64", "riscv64", "riscv32"]
     #[arg(long, value_parser = parse_target_arch)]
     pub target_arch: Option<TargetArch>,
 }
