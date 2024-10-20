@@ -17,9 +17,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --workspace --release
+      run: cargo build --release
     - name: Run tests
-      run: cargo test --workspace --release
+      run: cargo test --release
   
   fmt:
     runs-on: ubuntu-latest
@@ -27,7 +27,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Check formatting
-      run: cargo fmt --check --workspace
+      run: cargo fmt --check
 
   test:
     runs-on: ubuntu-latest
