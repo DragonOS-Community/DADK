@@ -117,9 +117,7 @@ pub trait TestContextExt: TestContext {
 impl DadkUserExecuteContextBuilder {
     /// 用于测试的默认构建器
     #[cfg(test)]
-    fn default_test_execute_context_builder(
-        base_context: &BaseTestContext,
-    ) -> Self {
+    fn default_test_execute_context_builder(base_context: &BaseTestContext) -> Self {
         Self::default()
             .sysroot_dir(Some(base_context.fake_dragonos_sysroot()))
             .action(Action::Build)
@@ -140,7 +138,7 @@ impl TestContext for DadkExecuteContextTestBuildX86_64V1 {
     fn setup() -> Self {
         let base_context = BaseTestContext::setup();
         let context =
-        DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
+            DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::X86_64)
                 .config_dir(Some(base_context.config_v1_dir()))
                 .build()
@@ -161,7 +159,7 @@ impl TestContext for DadkExecuteContextTestBuildRiscV64V1 {
     fn setup() -> Self {
         let base_context = BaseTestContext::setup();
         let context =
-        DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
+            DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::RiscV64)
                 .config_dir(Some(base_context.config_v1_dir()))
                 .build()
