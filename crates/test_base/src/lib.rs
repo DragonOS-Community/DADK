@@ -68,6 +68,9 @@ impl TestContext for BaseTestContext {
         let mut project_base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         project_base_path.pop();
         project_base_path.pop();
+        // 设置workdir
+        std::env::set_current_dir(&project_base_path).ok();
+
         let r = BaseTestContext { project_base_path };
         r.ensure_fake_dragonos_dir_exist();
         r.ensure_fake_dadk_cache_root_exist();

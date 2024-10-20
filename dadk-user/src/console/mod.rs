@@ -29,7 +29,7 @@ use self::clean::CleanArg;
 pub struct CommandLineArgs {
     /// DragonOS sysroot在主机上的路径
     #[arg(short, long, value_parser = parse_check_dir_exists)]
-    pub dragonos_dir: Option<PathBuf>,
+    pub sysroot_dir: Option<PathBuf>,
     /// DADK任务配置文件所在目录
     #[arg(short, long, value_parser = parse_check_dir_exists)]
     pub config_dir: Option<PathBuf>,
@@ -72,7 +72,6 @@ fn parse_target_arch(s: &str) -> Result<TargetArch, String> {
     return Ok(x.unwrap());
 }
 
-/// @brief 要执行的操作
 #[derive(Debug, Subcommand, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     /// 构建所有项目
