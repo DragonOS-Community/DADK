@@ -1,0 +1,26 @@
+[package]
+name = "dadk"
+authors = [
+    "longjin <longjin@DragonOS.org>",
+    "chikejian <chikejian@DragonOS.org>",
+    "xuzihao <xuzihao@DragonOS.org>"
+]
+
+version = "0.1.11"
+edition = "2021"
+description = "DragonOS Application Development Kit\nDragonOS应用开发工具"
+license = "GPL-2.0-only"
+repository = "https://github.com/DragonOS-Community/DADK.git"
+readme = "README.md"
+
+
+[[bin]]
+name = "dadk"
+path = "src/main.rs"
+doc = true
+
+
+[dependencies]
+dadk-user = { path = "../dadk-user" }
+env_logger = "0.11.5"
+log = "0.4.22"

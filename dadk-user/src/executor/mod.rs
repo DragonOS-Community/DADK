@@ -10,7 +10,7 @@ use log::{debug, error, info, warn};
 
 use crate::{
     console::{clean::CleanLevel, Action},
-    context::DadkExecuteContext,
+    context::DadkUserExecuteContext,
     executor::cache::CacheDir,
     parser::{
         task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
@@ -616,7 +616,7 @@ pub enum ExecutorError {
 /// # 准备全局环境变量
 pub fn prepare_env(
     sched_entities: &SchedEntities,
-    execute_ctx: &Arc<DadkExecuteContext>,
+    execute_ctx: &Arc<DadkUserExecuteContext>,
 ) -> Result<(), ExecutorError> {
     info!("Preparing environment variables...");
     let env_list = create_global_env_list(sched_entities, execute_ctx)?;
@@ -629,7 +629,7 @@ pub fn prepare_env(
 /// # 创建全局环境变量列表
 fn create_global_env_list(
     sched_entities: &SchedEntities,
-    execute_ctx: &Arc<DadkExecuteContext>,
+    execute_ctx: &Arc<DadkUserExecuteContext>,
 ) -> Result<EnvMap, ExecutorError> {
     let mut env_list = EnvMap::new();
     let envs: Vars = std::env::vars();

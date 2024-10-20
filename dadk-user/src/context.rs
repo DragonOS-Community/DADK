@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Debug, Builder)]
 #[builder(setter(into))]
-pub struct DadkExecuteContext {
+pub struct DadkUserExecuteContext {
     /// DragonOS sysroot在主机上的路径
     sysroot_dir: Option<PathBuf>,
     /// DADK任务配置文件所在目录
@@ -39,7 +39,7 @@ pub struct DadkExecuteContext {
     self_ref: Mutex<Weak<Self>>,
 }
 
-impl DadkExecuteContext {
+impl DadkUserExecuteContext {
     pub fn init(&self, self_arc: Arc<Self>) {
         self.set_self_ref(Arc::downgrade(&self_arc));
 
@@ -111,16 +111,16 @@ impl DadkExecuteContext {
 pub trait TestContextExt: TestContext {
     fn base_context(&self) -> &BaseTestContext;
 
-    fn execute_context(&self) -> &DadkExecuteContext;
+    fn execute_context(&self) -> &DadkUserExecuteContext;
 }
 
-impl DadkExecuteContextBuilder {
+impl DadkUserExecuteContextBuilder {
     /// 用于测试的默认构建器
     #[cfg(test)]
     fn default_test_execute_context_builder(
         base_context: &BaseTestContext,
-    ) -> DadkExecuteContextBuilder {
-        DadkExecuteContextBuilder::default()
+    ) -> Self {
+        Self::default()
             .sysroot_dir(Some(base_context.fake_dragonos_sysroot()))
             .action(Action::Build)
             .thread_num(None)
@@ -132,7 +132,7 @@ impl DadkExecuteContextBuilder {
 
 #[cfg(test)]
 pub struct DadkExecuteContextTestBuildX86_64V1 {
-    context: Arc<DadkExecuteContext>,
+    context: Arc<DadkUserExecuteContext>,
 }
 
 #[cfg(test)]
@@ -140,7 +140,7 @@ impl TestContext for DadkExecuteContextTestBuildX86_64V1 {
     fn setup() -> Self {
         let base_context = BaseTestContext::setup();
         let context =
-            DadkExecuteContextBuilder::default_test_execute_context_builder(&base_context)
+        DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::X86_64)
                 .config_dir(Some(base_context.config_v1_dir()))
                 .build()
@@ -153,7 +153,7 @@ impl TestContext for DadkExecuteContextTestBuildX86_64V1 {
 
 #[cfg(test)]
 pub struct DadkExecuteContextTestBuildRiscV64V1 {
-    context: Arc<DadkExecuteContext>,
+    context: Arc<DadkUserExecuteContext>,
 }
 
 #[cfg(test)]
@@ -161,7 +161,7 @@ impl TestContext for DadkExecuteContextTestBuildRiscV64V1 {
     fn setup() -> Self {
         let base_context = BaseTestContext::setup();
         let context =
-            DadkExecuteContextBuilder::default_test_execute_context_builder(&base_context)
+        DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::RiscV64)
                 .config_dir(Some(base_context.config_v1_dir()))
                 .build()
@@ -176,7 +176,7 @@ macro_rules! impl_for_test_context {
     ($context:ty) => {
         #[cfg(test)]
         impl std::ops::Deref for $context {
-            type Target = DadkExecuteContext;
+            type Target = DadkUserExecuteContext;
 
             fn deref(&self) -> &Self::Target {
                 &self.context
@@ -189,7 +189,7 @@ macro_rules! impl_for_test_context {
                 self.base_test_context.as_ref().unwrap()
             }
 
-            fn execute_context(&self) -> &DadkExecuteContext {
+            fn execute_context(&self) -> &DadkUserExecuteContext {
                 &self.context
             }
         }

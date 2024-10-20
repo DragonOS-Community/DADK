@@ -14,7 +14,7 @@ use log::{error, info};
 
 use crate::{
     console::Action,
-    context::DadkExecuteContext,
+    context::DadkUserExecuteContext,
     executor::{target::Target, Executor},
     parser::task::DADKTask,
 };
@@ -266,7 +266,7 @@ pub struct Scheduler {
     /// 调度实体列表
     target: SchedEntities,
     /// dadk执行的上下文
-    context: Arc<DadkExecuteContext>,
+    context: Arc<DadkUserExecuteContext>,
 }
 
 pub enum SchedulerError {
@@ -304,7 +304,7 @@ impl Debug for SchedulerError {
 
 impl Scheduler {
     pub fn new(
-        context: Arc<DadkExecuteContext>,
+        context: Arc<DadkUserExecuteContext>,
         dragonos_dir: PathBuf,
         action: Action,
         tasks: Vec<(PathBuf, DADKTask)>,

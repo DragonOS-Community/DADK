@@ -91,7 +91,6 @@ extern crate lazy_static;
 extern crate log;
 extern crate serde;
 extern crate serde_json;
-extern crate simple_logger;
 
 #[cfg(test)]
 extern crate test_base;
@@ -102,11 +101,10 @@ use clap::Parser;
 
 use log::{error, info};
 use parser::task::DADKTask;
-use simple_logger::SimpleLogger;
 
 use crate::{
     console::{interactive::InteractiveConsole, CommandLineArgs},
-    context::DadkExecuteContextBuilder,
+    context::DadkUserExecuteContextBuilder,
     scheduler::Scheduler,
 };
 
@@ -118,16 +116,13 @@ mod scheduler;
 pub mod static_resources;
 mod utils;
 
-pub fn dadk_main() {
-    logger_init();
-    // generate_tmp_dadk();
-    info!("DADK Starting...");
+pub fn dadk_user_main() {
     let args = CommandLineArgs::parse();
 
     info!("DADK run with args: {:?}", &args);
 
-    let context = DadkExecuteContextBuilder::default()
-        .sysroot_dir(args.dragonos_dir)
+    let context = DadkUserExecuteContextBuilder::default()
+        .sysroot_dir(args.sysroot_dir)
         .config_dir(args.config_dir)
         .action(args.action)
         .thread_num(args.thread)
@@ -195,13 +190,4 @@ pub fn dadk_main() {
     if r.is_err() {
         exit(1);
     }
-}
-
-/// 初始化日志系统
-fn logger_init() {
-    // 初始化日志系统，日志级别为Info
-    // 如果需要调试，可以将日志级别设置为Debug
-    let logger = SimpleLogger::new().with_level(log::LevelFilter::Info);
-
-    logger.init().unwrap();
 }
