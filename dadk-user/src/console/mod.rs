@@ -12,9 +12,6 @@
 //!
 
 pub mod clean;
-pub mod elements;
-pub mod interactive;
-pub mod new_config;
 
 use std::path::PathBuf;
 
@@ -82,8 +79,6 @@ pub enum Action {
     Install,
     /// 尚不支持
     Uninstall,
-    /// 使用交互式命令行创建dadk任务配置文件
-    New,
 }
 
 #[allow(dead_code)]

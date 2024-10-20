@@ -55,10 +55,6 @@ impl DadkUserExecuteContext {
             TASK_DEQUE.lock().unwrap().set_thread(thread);
         }
 
-        if self.action() == &Action::New {
-            return;
-        }
-
         if self.config_dir().is_none() {
             error!("Config dir is required for action: {:?}", self.action());
             exit(1);
