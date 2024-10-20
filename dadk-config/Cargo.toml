@@ -1,0 +1,11 @@
+[package]
+name = "dadk-config"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "longjin <longjin@DragonOS.org>",
+    "chikejian <chikejian@DragonOS.org>",
+    "xuzihao <xuzihao@DragonOS.org>"
+]
+
+[dependencies]

@@ -99,13 +99,11 @@ use std::{path::PathBuf, process::exit, sync::Arc};
 
 use clap::Parser;
 
-use log::{error, info};
+use log::info;
 use parser::task::DADKTask;
 
 use crate::{
-    console::{interactive::InteractiveConsole, CommandLineArgs},
-    context::DadkUserExecuteContextBuilder,
-    scheduler::Scheduler,
+    console::CommandLineArgs, context::DadkUserExecuteContextBuilder, scheduler::Scheduler,
 };
 
 mod console;
@@ -150,23 +148,6 @@ pub fn dadk_user_main() {
         "Thread num: {}",
         context.thread_num().map_or_else(|| 0, |t| t)
     );
-
-    match context.action() {
-        console::Action::New => {
-            let r = InteractiveConsole::new(
-                context.sysroot_dir().cloned(),
-                context.config_dir().cloned(),
-                *context.action(),
-            )
-            .run();
-            if r.is_err() {
-                error!("Failed to run interactive console: {:?}", r.unwrap_err());
-                exit(1);
-            }
-            exit(0);
-        }
-        _ => {}
-    }
 
     let mut parser = parser::Parser::new(context.config_dir().unwrap().clone());
     let r = parser.parse();

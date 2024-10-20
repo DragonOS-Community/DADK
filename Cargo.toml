@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/test_base", "dadk", "dadk-user",
+    "crates/test_base", "dadk", "dadk-config", "dadk-user",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

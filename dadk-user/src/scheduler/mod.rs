@@ -260,7 +260,7 @@ impl SchedEntities {
 #[derive(Debug)]
 pub struct Scheduler {
     /// DragonOS sysroot在主机上的路径
-    dragonos_dir: PathBuf,
+    sysroot_dir: PathBuf,
     /// 要执行的操作
     action: Action,
     /// 调度实体列表
@@ -312,7 +312,7 @@ impl Scheduler {
         let entities = SchedEntities::new();
 
         let mut scheduler = Scheduler {
-            dragonos_dir,
+            sysroot_dir: dragonos_dir,
             action,
             target: entities,
             context,
@@ -471,7 +471,7 @@ impl Scheduler {
         let r: Vec<Arc<SchedEntity>> = self.target.topo_sort();
 
         let action = self.action.clone();
-        let dragonos_dir = self.dragonos_dir.clone();
+        let dragonos_dir = self.sysroot_dir.clone();
         let id2entity = self.target.id2entity();
         let count = r.len();
 
@@ -489,7 +489,7 @@ impl Scheduler {
     fn run_without_topo_sort(&self) -> Result<(), SchedulerError> {
         // 启动守护线程
         let action = self.action.clone();
-        let dragonos_dir = self.dragonos_dir.clone();
+        let dragonos_dir = self.sysroot_dir.clone();
         let mut r = self.target.entities();
         let handler = std::thread::spawn(move || {
             Self::clean_daemon(action, dragonos_dir, &mut r);
