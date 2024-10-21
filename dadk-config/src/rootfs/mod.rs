@@ -77,6 +77,15 @@ mod tests {
         assert_eq!(config.metadata.fs_type, FsType::Fat32);
         assert_eq!(config.metadata.size, 512 * 1024 * 1024); // Assuming `deserialize_size` converts MB to Bytes
     }
+    #[test]
+    fn test_load_from_invalid_fs_type() {
+        let config_content = r#"
+            [metadata]
+            fs_type = "ABCDE"
+            size = "512M"
+        "#;
+        assert!(RootFSConfigFile::load_from_str(config_content).is_err());
+    }
 
     /// 测试size为int类型的字节大小
     #[test]
@@ -116,12 +125,26 @@ mod tests {
         assert!(RootFSConfigFile::load(&config_path).is_err());
     }
 
+    /// Parse from an incorrect size field (string)
     #[test]
-    fn test_load_from_invalid_str() {
+    fn test_load_from_invalid_size_str() {
         let invalid_config_content = r#"
             [metadata]
-            fs_type = "unknown"
+            fs_type = "fat32"
             size = "not_a_size"
+        "#;
+
+        assert!(RootFSConfigFile::load_from_str(invalid_config_content).is_err());
+    }
+
+    /// Parse from an incorrect size field (array)
+    #[test]
+    fn test_load_from_invalid_size_array() {
+        // The 'size' field should not be an array
+        let invalid_config_content = r#"
+            [metadata]
+            fs_type = "fat32"
+            size = ["not_a_size"]
         "#;
 
         assert!(RootFSConfigFile::load_from_str(invalid_config_content).is_err());
