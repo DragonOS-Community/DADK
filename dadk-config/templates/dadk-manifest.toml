@@ -1,0 +1,6 @@
+# Configuration template placed in the root directory of the DragonOS workspace
+# Named `dadk-manifest.toml`
+
+[metadata]
+# Target architecture. Options: x86_64, riscv64
+target_arch = "x86_64"

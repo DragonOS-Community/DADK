@@ -9,3 +9,11 @@ authors = [
 ]
 
 [dependencies]
+anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
+serde = { version = "1.0.160", features = ["serde_derive"] }
+serde_json = "1.0.96"
+toml = "0.8.12"
+
+# 只有在test的情况下才会引入下列库
+[dev-dependencies]
+tempfile = "3.13.0"
