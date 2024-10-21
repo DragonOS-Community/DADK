@@ -73,3 +73,57 @@ impl TestContext for BaseGlobalTestContext {
         r
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_project_base_path() {
+        let context = BaseGlobalTestContext::setup();
+        let binding = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let expected_path = binding.parent().unwrap().parent().unwrap();
+        assert_eq!(context.project_base_path(), &expected_path);
+    }
+
+    #[test]
+    fn test_abs_path() {
+        let context = BaseGlobalTestContext::setup();
+        let relative_path = "some/relative/path";
+        let expected_path = context.project_base_path().join(relative_path);
+        assert_eq!(context.abs_path(relative_path), expected_path);
+    }
+
+    #[test]
+    fn test_config_v1_dir() {
+        let context = BaseGlobalTestContext::setup();
+        let expected_path = context.abs_path(BaseGlobalTestContext::CONFIG_V1_DIR);
+        assert_eq!(context.config_v1_dir(), expected_path);
+    }
+
+    #[test]
+    fn test_fake_dadk_cache_root() {
+        let context = BaseGlobalTestContext::setup();
+        let expected_path = context.abs_path(BaseGlobalTestContext::FAKE_DADK_CACHE_ROOT);
+        assert_eq!(context.fake_dadk_cache_root(), expected_path);
+        assert!(expected_path.exists());
+    }
+
+    #[test]
+    fn test_fake_dragonos_sysroot() {
+        let context = BaseGlobalTestContext::setup();
+        let expected_path = context.abs_path(BaseGlobalTestContext::FAKE_DRAGONOS_SYSROOT);
+        assert_eq!(context.fake_dragonos_sysroot(), expected_path);
+        assert!(expected_path.exists());
+    }
+
+    #[test]
+    fn test_setup() {
+        let context = BaseGlobalTestContext::setup();
+        assert!(context.project_base_path().is_dir());
+        assert_eq!(
+            env::var("DADK_CACHE_ROOT").unwrap(),
+            context.fake_dadk_cache_root().to_str().unwrap()
+        );
+    }
+}

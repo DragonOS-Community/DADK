@@ -41,3 +41,29 @@ impl TestContext for DadkConfigTestContext {
         r
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_test_base_path() {
+        let test_context = DadkConfigTestContext::setup();
+        let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("dadk-config");
+        assert_eq!(test_context.test_base_path(), &expected_path);
+    }
+
+    #[test]
+    fn test_abs_path() {
+        let test_context = DadkConfigTestContext::setup();
+        let relative_path = "some_relative_path";
+        let expected_path = test_context.test_base_path().join(relative_path);
+        assert_eq!(test_context.abs_path(relative_path), expected_path);
+    }
+}
