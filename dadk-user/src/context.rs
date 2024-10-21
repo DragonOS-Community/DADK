@@ -7,7 +7,7 @@ use std::{
 use derive_builder::Builder;
 use log::error;
 #[cfg(test)]
-use test_base::{test_context::TestContext, BaseTestContext};
+use test_base::{global::BaseGlobalTestContext, test_context::TestContext};
 
 use crate::{
     console::Action, executor::cache::cache_root_init, parser::task::TargetArch,
@@ -33,7 +33,7 @@ pub struct DadkUserExecuteContext {
     target_arch: TargetArch,
 
     #[cfg(test)]
-    base_test_context: Option<BaseTestContext>,
+    base_test_context: Option<BaseGlobalTestContext>,
 
     #[builder(setter(skip), default = "Mutex::new(Weak::new())")]
     self_ref: Mutex<Weak<Self>>,
@@ -105,7 +105,7 @@ impl DadkUserExecuteContext {
 
 #[cfg(test)]
 pub trait TestContextExt: TestContext {
-    fn base_context(&self) -> &BaseTestContext;
+    fn base_context(&self) -> &BaseGlobalTestContext;
 
     fn execute_context(&self) -> &DadkUserExecuteContext;
 }
@@ -113,7 +113,7 @@ pub trait TestContextExt: TestContext {
 impl DadkUserExecuteContextBuilder {
     /// 用于测试的默认构建器
     #[cfg(test)]
-    fn default_test_execute_context_builder(base_context: &BaseTestContext) -> Self {
+    fn default_test_execute_context_builder(base_context: &BaseGlobalTestContext) -> Self {
         Self::default()
             .sysroot_dir(Some(base_context.fake_dragonos_sysroot()))
             .action(Action::Build)
@@ -132,7 +132,7 @@ pub struct DadkExecuteContextTestBuildX86_64V1 {
 #[cfg(test)]
 impl TestContext for DadkExecuteContextTestBuildX86_64V1 {
     fn setup() -> Self {
-        let base_context = BaseTestContext::setup();
+        let base_context = BaseGlobalTestContext::setup();
         let context =
             DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::X86_64)
@@ -153,7 +153,7 @@ pub struct DadkExecuteContextTestBuildRiscV64V1 {
 #[cfg(test)]
 impl TestContext for DadkExecuteContextTestBuildRiscV64V1 {
     fn setup() -> Self {
-        let base_context = BaseTestContext::setup();
+        let base_context = BaseGlobalTestContext::setup();
         let context =
             DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::RiscV64)
@@ -179,7 +179,7 @@ macro_rules! impl_for_test_context {
 
         #[cfg(test)]
         impl TestContextExt for $context {
-            fn base_context(&self) -> &BaseTestContext {
+            fn base_context(&self) -> &BaseGlobalTestContext {
                 self.base_test_context.as_ref().unwrap()
             }
 

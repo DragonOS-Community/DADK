@@ -1,6 +1,6 @@
 use test_base::{
+    global::BaseGlobalTestContext,
     test_context::{self as test_context, test_context},
-    BaseTestContext,
 };
 
 use crate::{
@@ -161,9 +161,9 @@ fn should_run_task_include_riscv64_on_riscv64(ctx: &DadkExecuteContextTestBuildR
 }
 
 /// 确保文件 app_all_target_arch_0_1_0.dadk 包含了所有的目标架构
-#[test_context(BaseTestContext)]
+#[test_context(BaseGlobalTestContext)]
 #[test]
-fn ensure_all_target_arch_testcase_v1(ctx: &BaseTestContext) {
+fn ensure_all_target_arch_testcase_v1(ctx: &BaseGlobalTestContext) {
     let config_file = ctx.config_v1_dir().join("app_all_target_arch_0_1_0.dadk");
     let task = Parser::new(ctx.config_v1_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
