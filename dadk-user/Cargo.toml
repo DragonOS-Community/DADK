@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "=0.4.35", features = ["serde"] }
-clap = { version = "=4.5.4", features = ["derive"] }
+clap = { version = "=4.5.20", features = ["derive"] }
 derive_builder = "0.20.0"
 lazy_static = "1.4.0"
 log = "0.4.17"
