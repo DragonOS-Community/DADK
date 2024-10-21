@@ -1,6 +1,6 @@
 use test_base::{
+    global::BaseGlobalTestContext,
     test_context::{self as test_context, test_context},
-    BaseTestContext,
 };
 use tests::task::{BuildConfig, TargetArch, TaskType};
 
@@ -8,9 +8,9 @@ use crate::executor::source::LocalSource;
 
 use super::*;
 
-#[test_context(BaseTestContext)]
+#[test_context(BaseGlobalTestContext)]
 #[test]
-fn parse_normal_v1(ctx: &mut BaseTestContext) {
+fn parse_normal_v1(ctx: &mut BaseGlobalTestContext) {
     let parser = Parser::new(ctx.config_v1_dir());
     let config_file = ctx.config_v1_dir().join("app_normal_0_1_0.dadk");
     let result = parser.parse_config_file(&config_file);
@@ -48,9 +48,9 @@ fn parse_normal_v1(ctx: &mut BaseTestContext) {
     assert_eq!(result.install_once, false);
 }
 
-#[test_context(BaseTestContext)]
+#[test_context(BaseGlobalTestContext)]
 #[test]
-fn target_arch_field_has_one_v1(ctx: &mut BaseTestContext) {
+fn target_arch_field_has_one_v1(ctx: &mut BaseGlobalTestContext) {
     let parser = Parser::new(ctx.config_v1_dir());
     let config_file = ctx
         .config_v1_dir()
@@ -68,9 +68,9 @@ fn target_arch_field_has_one_v1(ctx: &mut BaseTestContext) {
     assert_eq!(result.target_arch[0], TargetArch::X86_64);
 }
 
-#[test_context(BaseTestContext)]
+#[test_context(BaseGlobalTestContext)]
 #[test]
-fn target_arch_field_has_one_uppercase_v1(ctx: &mut BaseTestContext) {
+fn target_arch_field_has_one_uppercase_v1(ctx: &mut BaseGlobalTestContext) {
     let parser = Parser::new(ctx.config_v1_dir());
     let config_file = ctx
         .config_v1_dir()
@@ -88,9 +88,9 @@ fn target_arch_field_has_one_uppercase_v1(ctx: &mut BaseTestContext) {
     assert_eq!(result.target_arch[0], TargetArch::X86_64);
 }
 
-#[test_context(BaseTestContext)]
+#[test_context(BaseGlobalTestContext)]
 #[test]
-fn target_arch_field_empty_should_failed_v1(ctx: &mut BaseTestContext) {
+fn target_arch_field_empty_should_failed_v1(ctx: &mut BaseGlobalTestContext) {
     let parser = Parser::new(ctx.config_v1_dir());
     let config_file = ctx
         .config_v1_dir()

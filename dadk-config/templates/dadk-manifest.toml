@@ -3,4 +3,13 @@
 
 [metadata]
 # Target architecture. Options: x86_64, riscv64
-target_arch = "x86_64"
+arch = "x86_64"
+
+# Hypervisor config path
+hypervisor_config = "config/hypervisor.toml"
+
+# RootFS config path
+rootfs_config = "config/rootfs.toml"
+
+# Boot config path
+boot_config = "config/boot.toml"
