@@ -97,19 +97,12 @@ extern crate test_base;
 
 use std::{path::PathBuf, process::exit, sync::Arc};
 
-use clap::Parser;
-
 use log::info;
-use parser::task::DADKTask;
 
-use crate::{
-    console::CommandLineArgs, context::DadkUserExecuteContextBuilder, scheduler::Scheduler,
-};
+use crate::{context::DadkUserExecuteContextBuilder, scheduler::Scheduler};
 
-mod console;
 mod context;
 mod executor;
-pub mod parser;
 mod scheduler;
 pub mod static_resources;
 mod utils;
