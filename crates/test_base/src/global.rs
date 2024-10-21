@@ -58,7 +58,7 @@ impl BaseGlobalTestContext {
 
 impl TestContext for BaseGlobalTestContext {
     fn setup() -> Self {
-        env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+        env_logger::try_init_from_env(env_logger::Env::default().default_filter_or("info")).ok();
 
         // 获取DADK项目的根目录
         let mut project_base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

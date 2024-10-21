@@ -22,7 +22,7 @@ impl DadkConfigTestContext {
 
 impl TestContext for DadkConfigTestContext {
     fn setup() -> Self {
-        env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+        env_logger::try_init_from_env(env_logger::Env::default().default_filter_or("info")).ok();
 
         // 获取dadk-config包的根目录
         let mut test_base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

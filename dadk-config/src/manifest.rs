@@ -28,7 +28,7 @@ impl DadkManifest {
 
     fn do_load(content: &str) -> Result<Self> {
         // Parse TOML content
-        let mut manifest_toml: DadkManifest = toml::from_str(&content)?;
+        let mut manifest_toml: DadkManifest = toml::from_str(content)?;
 
         manifest_toml.used_default = check_used_default();
 
@@ -38,7 +38,7 @@ impl DadkManifest {
 
 thread_local! {
     /// Global variable to track if default values were used during deserialization.
-    static USED_DEFAULT: std::cell::Cell<bool> = std::cell::Cell::new(false);
+    static USED_DEFAULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Call this function to set a flag when
