@@ -73,3 +73,78 @@ impl Serialize for TargetArch {
         serializer.serialize_str(string.as_str())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_default() {
+        let default_arch = TargetArch::default();
+        assert_eq!(default_arch, TargetArch::X86_64);
+    }
+
+    #[test]
+    fn test_try_from_valid() {
+        let x86_64 = TargetArch::try_from("x86_64").unwrap();
+        assert_eq!(x86_64, TargetArch::X86_64);
+
+        let riscv64 = TargetArch::try_from("riscv64").unwrap();
+        assert_eq!(riscv64, TargetArch::RiscV64);
+    }
+
+    #[test]
+    fn test_try_from_invalid() {
+        let result = TargetArch::try_from("unknown");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Unknown target arch: unknown");
+    }
+
+    #[test]
+    fn test_into_str() {
+        let x86_64: &str = TargetArch::X86_64.into();
+        assert_eq!(x86_64, "x86_64");
+
+        let riscv64: &str = TargetArch::RiscV64.into();
+        assert_eq!(riscv64, "riscv64");
+    }
+
+    #[test]
+    fn test_into_string() {
+        let x86_64: String = TargetArch::X86_64.into();
+        assert_eq!(x86_64, "x86_64");
+
+        let riscv64: String = TargetArch::RiscV64.into();
+        assert_eq!(riscv64, "riscv64");
+    }
+
+    #[test]
+    fn test_deserialize_valid() {
+        let json_x86_64 = r#""x86_64""#;
+        let x86_64: TargetArch = serde_json::from_str(json_x86_64).unwrap();
+        assert_eq!(x86_64, TargetArch::X86_64);
+
+        let json_riscv64 = r#""riscv64""#;
+        let riscv64: TargetArch = serde_json::from_str(json_riscv64).unwrap();
+        assert_eq!(riscv64, TargetArch::RiscV64);
+    }
+
+    #[test]
+    fn test_deserialize_invalid() {
+        let json_unknown = r#""unknown""#;
+        let result: Result<TargetArch, _> = serde_json::from_str(json_unknown);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_serialize() {
+        let x86_64 = TargetArch::X86_64;
+        let serialized_x86_64 = serde_json::to_string(&x86_64).unwrap();
+        assert_eq!(serialized_x86_64, r#""x86_64""#);
+
+        let riscv64 = TargetArch::RiscV64;
+        let serialized_riscv64 = serde_json::to_string(&riscv64).unwrap();
+        assert_eq!(serialized_riscv64, r#""riscv64""#);
+    }
+}
