@@ -10,7 +10,7 @@ use toml;
 
 /// The main configuration file for DADK
 #[derive(Debug, Clone, Deserialize)]
-pub struct DadkManifest {
+pub struct DadkManifestFile {
     pub metadata: Metadata,
 
     /// A flag variable used to indicate whether
@@ -19,16 +19,16 @@ pub struct DadkManifest {
     pub used_default: bool,
 }
 
-impl DadkManifest {
+impl DadkManifestFile {
     pub fn load(path: &PathBuf) -> Result<Self> {
         // 读取文件内容
         let content = fs::read_to_string(path)?;
-        Self::do_load(&content)
+        Self::load_from_str(&content)
     }
 
-    fn do_load(content: &str) -> Result<Self> {
+    pub fn load_from_str(content: &str) -> Result<Self> {
         // Parse TOML content
-        let mut manifest_toml: DadkManifest = toml::from_str(content)?;
+        let mut manifest_toml: DadkManifestFile = toml::from_str(content)?;
 
         manifest_toml.used_default = check_used_default();
 
@@ -110,7 +110,7 @@ mod tests {
         temp_file.write_all(toml_content.as_bytes())?;
 
         let path = temp_file.path().to_path_buf();
-        let manifest = DadkManifest::load(&path)?;
+        let manifest = DadkManifestFile::load(&path)?;
 
         assert_eq!(manifest.metadata.arch, TargetArch::X86_64);
         assert_eq!(
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_load_file_not_found() {
         let path = PathBuf::from("non_existent_file.toml");
-        let result = DadkManifest::load(&path);
+        let result = DadkManifestFile::load(&path);
 
         assert!(result.is_err());
     }
@@ -151,7 +151,7 @@ mod tests {
         temp_file.write_all(invalid_toml_content.as_bytes())?;
 
         let path = temp_file.path().to_path_buf();
-        let result = DadkManifest::load(&path);
+        let result = DadkManifestFile::load(&path);
 
         assert!(result.is_err());
 
@@ -171,7 +171,7 @@ mod tests {
         temp_file.write_all(invalid_toml_content.as_bytes())?;
 
         let path = temp_file.path().to_path_buf();
-        let result = DadkManifest::load(&path);
+        let result = DadkManifestFile::load(&path);
 
         assert!(result.is_err());
 
@@ -190,7 +190,7 @@ mod tests {
         temp_file.write_all(toml_content.as_bytes())?;
 
         let path = temp_file.path().to_path_buf();
-        let result = DadkManifest::load(&path);
+        let result = DadkManifestFile::load(&path);
 
         assert!(result.is_err());
 
@@ -208,7 +208,7 @@ mod tests {
         let mut temp_file = NamedTempFile::new()?;
         temp_file.write_all(toml_content.as_bytes())?;
         let path = temp_file.path().to_path_buf();
-        let manifest = DadkManifest::load(&path)?;
+        let manifest = DadkManifestFile::load(&path)?;
         assert_eq!(manifest.used_default, true);
         assert_eq!(
             manifest.metadata.rootfs_config,

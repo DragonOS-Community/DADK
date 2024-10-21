@@ -18,6 +18,12 @@ impl DadkConfigTestContext {
     pub fn abs_path(&self, relative_path: &str) -> PathBuf {
         self.test_base_path.join(relative_path)
     }
+
+    /// 获取 dadk配置模版的路径
+    pub fn templates_dir(&self) -> PathBuf {
+        const TEMPLATES_DIR: &str = "templates";
+        self.abs_path(TEMPLATES_DIR)
+    }
 }
 
 impl TestContext for DadkConfigTestContext {
