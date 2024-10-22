@@ -1,8 +1,9 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// 目标处理器架构
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TargetArch {
+    #[default]
     X86_64,
     RiscV64,
 }
@@ -10,12 +11,6 @@ pub enum TargetArch {
 impl TargetArch {
     /// 期望的目标处理器架构（如果修改了枚举，那一定要修改这里）
     pub const EXPECTED: [&'static str; 2] = ["x86_64", "riscv64"];
-}
-
-impl Default for TargetArch {
-    fn default() -> Self {
-        TargetArch::X86_64
-    }
 }
 
 impl TryFrom<&str> for TargetArch {
@@ -30,18 +25,18 @@ impl TryFrom<&str> for TargetArch {
     }
 }
 
-impl Into<&str> for TargetArch {
-    fn into(self) -> &'static str {
-        match self {
+impl From<TargetArch> for &str {
+    fn from(val: TargetArch) -> Self {
+        match val {
             TargetArch::X86_64 => "x86_64",
             TargetArch::RiscV64 => "riscv64",
         }
     }
 }
 
-impl Into<String> for TargetArch {
-    fn into(self) -> String {
-        let x: &str = self.into();
+impl From<TargetArch> for String {
+    fn from(val: TargetArch) -> Self {
+        let x: &str = val.into();
         x.to_string()
     }
 }
