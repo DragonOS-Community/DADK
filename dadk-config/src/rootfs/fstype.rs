@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer};
 
+/// Possible filesystem types for rootfs
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsType {
     Fat32,
