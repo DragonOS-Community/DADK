@@ -88,6 +88,7 @@
 
 #[macro_use]
 extern crate lazy_static;
+pub extern crate clap;
 extern crate log;
 extern crate serde;
 extern crate serde_json;
@@ -97,8 +98,6 @@ extern crate test_base;
 
 use std::{path::PathBuf, process::exit, sync::Arc};
 
-use clap::Parser;
-
 use log::info;
 use parser::task::DADKTask;
 
@@ -106,7 +105,7 @@ use crate::{
     console::CommandLineArgs, context::DadkUserExecuteContextBuilder, scheduler::Scheduler,
 };
 
-mod console;
+pub mod console;
 mod context;
 mod executor;
 pub mod parser;
@@ -114,11 +113,7 @@ mod scheduler;
 pub mod static_resources;
 mod utils;
 
-pub fn dadk_user_main() {
-    let args = CommandLineArgs::parse();
-
-    info!("DADK run with args: {:?}", &args);
-
+pub fn dadk_user_main(args: CommandLineArgs) {
     let context = DadkUserExecuteContextBuilder::default()
         .sysroot_dir(args.sysroot_dir)
         .config_dir(args.config_dir)
