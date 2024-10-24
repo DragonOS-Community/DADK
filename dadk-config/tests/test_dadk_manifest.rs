@@ -14,5 +14,6 @@ fn test_load_dadk_manifest_template(ctx: &DadkConfigTestContext) {
     assert_eq!(manifest_path.exists(), true);
     assert_eq!(manifest_path.is_file(), true);
     let manifest = DadkManifestFile::load(&manifest_path).expect("Failed to load manifest");
+    // 验证 dadk-manifest.toml 已经包含了所有字段
     assert_eq!(manifest.used_default, false);
 }

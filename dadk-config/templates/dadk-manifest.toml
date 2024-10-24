@@ -13,3 +13,6 @@ rootfs_config = "config/rootfs.toml"
 
 # Boot config path
 boot_config = "config/boot.toml"
+
+# System root directory folder (DADK will copy the files in this directory to the root directory of the disk image)
+sysroot_dir = "bin/sysroot"

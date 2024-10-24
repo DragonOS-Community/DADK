@@ -4,13 +4,13 @@ use test_base::{
     test_context::{self as test_context, test_context},
 };
 
-const ROOTFS_MANIFEST_FILE_NAME: &str = "config/rootfs.toml";
+const ROOTFS_CONFIG_FILE_NAME: &str = "config/rootfs.toml";
 
 /// 测试加载模板目录中的 rootfs.toml 文件，验证它能被加载成功，并且已经包含了所有字段
 #[test_context(DadkConfigTestContext)]
 #[test]
 fn test_load_rootfs_manifest_template(ctx: &DadkConfigTestContext) {
-    let rootfs_manifest_path = ctx.templates_dir().join(ROOTFS_MANIFEST_FILE_NAME);
+    let rootfs_manifest_path = ctx.templates_dir().join(ROOTFS_CONFIG_FILE_NAME);
     assert_eq!(rootfs_manifest_path.exists(), true);
     assert_eq!(rootfs_manifest_path.is_file(), true);
     let _manifest =
