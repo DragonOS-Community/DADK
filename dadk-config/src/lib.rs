@@ -1,8 +1,9 @@
-#[deny(clippy::all)]
+#![deny(clippy::all)]
+pub mod boot;
 pub mod common;
-pub mod hypervisor;
 pub mod manifest;
 pub mod rootfs;
 pub mod user;
+mod utils;
 
 extern crate anyhow;

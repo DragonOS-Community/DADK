@@ -69,6 +69,10 @@ pub struct Metadata {
     /// Boot configuration file path
     #[serde(default = "default_boot_config_path")]
     pub boot_config: PathBuf,
+
+    /// Sysroot directory path
+    #[serde(default = "default_sysroot_dir")]
+    pub sysroot_dir: PathBuf,
 }
 
 /// Returns the default path for the rootfs configuration file.
@@ -89,6 +93,12 @@ fn default_boot_config_path() -> PathBuf {
     "config/boot.toml".into()
 }
 
+/// Returns the default path for the sysroot directory.
+fn default_sysroot_dir() -> PathBuf {
+    set_used_default();
+    "bin/sysroot".into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,6 +114,7 @@ mod tests {
             rootfs_config = "config/rootfs-x86_64.toml"
             hypervisor_config = "config/hypervisor-x86_64.toml"
             boot_config = "config/boot-x86_64.toml"
+            sysroot_dir = "bin/sysroot"
         "#;
 
         let mut temp_file = NamedTempFile::new()?;
@@ -125,6 +136,7 @@ mod tests {
             manifest.metadata.boot_config,
             PathBuf::from("config/boot-x86_64.toml")
         );
+        assert_eq!(manifest.metadata.sysroot_dir, PathBuf::from("bin/sysroot"));
         assert!(!manifest.used_default);
 
         Ok(())
