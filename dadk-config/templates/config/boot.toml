@@ -64,3 +64,27 @@ version = "v2023.10"
 # `path_prefix` is `bin/uboot/`,
 # then the path to locate the U-Boot binary file would be: `bin/uboot/riscv64/v2023.10/uboot.bin`
 path-prefix = "bin/uboot"
+
+
+[qemu]
+
+# (Optional) Path prefix for qemu binary.
+#
+# If not set, the default path will be used.
+#
+# Example:
+# Fill in `/usr/bin/qemu-system-`,
+# then for the `x86_64` architecture, `/usr/bin/qemu-system-x86_64` will be used.
+path-prefix = "qemu-system-"
+
+# Arguments to pass to qemu.
+args = """\
+    -machine virt \
+"""
+
+# Parameters to apply when no-graphic is enabled
+no-graphic-args = ""
+
+# (Optional) Hardware acceleration
+# 可选值："kvm", "tcg", "hvf", "none". 不填写时，默认为none
+accelerate = "kvm"

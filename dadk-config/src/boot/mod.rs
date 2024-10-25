@@ -3,6 +3,7 @@ use std::{fs, path::PathBuf};
 use anyhow::Result;
 use dragonstub::DragonStubConfig;
 use grub::GrubConfig;
+use hypervisor::qemu::QemuConfig;
 use metadata::BootMetadata;
 use serde::Deserialize;
 use uboot::UbootConfig;
@@ -26,6 +27,9 @@ pub struct BootConfigFile {
 
     /// U-Boot configuration
     pub uboot: Option<UbootConfig>,
+
+    /// QEMU configuration
+    pub qemu: Option<QemuConfig>,
 }
 
 impl BootConfigFile {

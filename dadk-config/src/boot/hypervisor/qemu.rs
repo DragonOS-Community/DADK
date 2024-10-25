@@ -29,6 +29,9 @@ pub struct QemuConfig {
     /// Parameters to apply when no-graphic is enabled
     #[serde(rename = "no-graphic-args")]
     pub no_graphic_args: String,
+
+    /// Hardware acceleration
+    accelerate: Option<QemuAccel>,
 }
 
 impl QemuConfig {
@@ -63,6 +66,23 @@ impl QemuConfig {
     pub fn args(&self) -> String {
         self.args.clone()
     }
+
+    /// Get the hardware acceleration configuration
+    pub fn accelerate(&self) -> QemuAccel {
+        self.accelerate.clone().unwrap_or(QemuAccel::None)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub enum QemuAccel {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "kvm")]
+    Kvm,
+    #[serde(rename = "hvf")]
+    Hvf,
+    #[serde(rename = "tcg")]
+    Tcg,
 }
 
 // Below are checked keys in qemu arguments. The key list is non-exhaustive.
@@ -237,5 +257,40 @@ mod tests {
 
         config.apply_qemu_args(&vec![]).unwrap();
         assert_eq!(config.args(), "-m 1G -nographic");
+    }
+
+    #[test]
+    fn test_qemu_accelerate_args() {
+        let s = r#""kvm""#;
+        let result: Result<QemuAccel, serde_json::Error> = serde_json::from_str(s);
+        match result {
+            Ok(QemuAccel::Kvm) => assert!(true),
+            _ => assert!(false, "Expected Ok(QemuAccel::Kvm) but got {:?}", result),
+        }
+
+        let s = r#""tcg""#;
+        let result: Result<QemuAccel, serde_json::Error> = serde_json::from_str(s);
+        match result {
+            Ok(QemuAccel::Tcg) => assert!(true),
+            _ => assert!(false, "Expected Ok(QemuAccel::Tcg) but got {:?}", result),
+        }
+
+        let s = r#""none""#;
+        let result: Result<QemuAccel, serde_json::Error> = serde_json::from_str(s);
+        match result {
+            Ok(QemuAccel::None) => assert!(true),
+            _ => assert!(false, "Expected Ok(QemuAccel::None) but got {:?}", result),
+        }
+
+        let s = r#""hvf""#;
+        let result: Result<QemuAccel, serde_json::Error> = serde_json::from_str(s);
+        match result {
+            Ok(QemuAccel::Hvf) => assert!(true),
+            _ => assert!(false, "Expected Ok(QemuAccel::Hvf) but got {:?}", result),
+        }
+
+        let s = r#""invalid""#;
+        let result: Result<QemuAccel, serde_json::Error> = serde_json::from_str(s);
+        assert!(result.is_err(), "Expected Err but got {:?}", result);
     }
 }
