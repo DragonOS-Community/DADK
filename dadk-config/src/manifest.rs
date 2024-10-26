@@ -59,20 +59,33 @@ pub struct Metadata {
     /// Target processor architecture
     pub arch: TargetArch,
     /// Rootfs configuration file path
-    #[serde(default = "default_rootfs_config_path")]
+    #[serde(default = "default_rootfs_config_path", rename = "rootfs-config")]
     pub rootfs_config: PathBuf,
 
     /// Hypervisor configuration file path
-    #[serde(default = "default_hypervisor_config_path")]
+    #[serde(
+        default = "default_hypervisor_config_path",
+        rename = "hypervisor-config"
+    )]
     pub hypervisor_config: PathBuf,
 
     /// Boot configuration file path
-    #[serde(default = "default_boot_config_path")]
+    #[serde(default = "default_boot_config_path", rename = "boot-config")]
     pub boot_config: PathBuf,
 
     /// Sysroot directory path
-    #[serde(default = "default_sysroot_dir")]
+    #[serde(default = "default_sysroot_dir", rename = "sysroot-dir")]
     pub sysroot_dir: PathBuf,
+
+    /// Root Cache directory path
+    #[serde(default = "default_cache_root_dir", rename = "cache-root-dir")]
+    pub cache_root_dir: PathBuf,
+
+    /// User configuration directory path
+    /// 这个字段只是临时用于兼容旧版本，v0.2版本重构完成后会删除
+    #[deprecated(note = "This field is deprecated and will be removed in DADK 0.2")]
+    #[serde(default = "default_user_config_dir", rename = "user-config-dir")]
+    pub user_config_dir: PathBuf,
 }
 
 /// Returns the default path for the rootfs configuration file.
@@ -99,6 +112,17 @@ fn default_sysroot_dir() -> PathBuf {
     "bin/sysroot".into()
 }
 
+/// Returns the default path for the cache directory.
+fn default_cache_root_dir() -> PathBuf {
+    set_used_default();
+    "bin/dadk_cache".into()
+}
+
+fn default_user_config_dir() -> PathBuf {
+    set_used_default();
+    "user/dadk/config".into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,10 +135,12 @@ mod tests {
         let toml_content = r#"
             [metadata]
             arch = "x86_64"
-            rootfs_config = "config/rootfs-x86_64.toml"
-            hypervisor_config = "config/hypervisor-x86_64.toml"
-            boot_config = "config/boot-x86_64.toml"
-            sysroot_dir = "bin/sysroot"
+            rootfs-config = "config/rootfs-x86_64.toml"
+            hypervisor-config = "config/hypervisor-x86_64.toml"
+            boot-config = "config/boot-x86_64.toml"
+            sysroot-dir = "bin/sysroot"
+            cache-root-dir = "bin/dadk_cache"
+            user-config-dir = "user/dadk/config"
         "#;
 
         let mut temp_file = NamedTempFile::new()?;

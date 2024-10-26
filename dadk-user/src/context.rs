@@ -4,15 +4,13 @@ use std::{
     sync::{Arc, Mutex, Weak},
 };
 
+use dadk_config::{common::target_arch::TargetArch, user::UserCleanLevel};
 use derive_builder::Builder;
 use log::error;
 #[cfg(test)]
 use test_base::{global::BaseGlobalTestContext, test_context::TestContext};
 
-use crate::{
-    console::Action, executor::cache::cache_root_init, parser::task::TargetArch,
-    scheduler::task_deque::TASK_DEQUE,
-};
+use crate::{executor::cache::cache_root_init, scheduler::task_deque::TASK_DEQUE};
 
 #[derive(Debug, Builder)]
 #[builder(setter(into))]
@@ -122,6 +120,16 @@ impl DadkUserExecuteContextBuilder {
             .base_test_context(Some(base_context.clone()))
             .clone()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    /// 构建所有项目
+    Build,
+    /// 清理缓存
+    Clean(UserCleanLevel),
+    /// 安装到DragonOS sysroot
+    Install,
 }
 
 #[cfg(test)]

@@ -6,11 +6,12 @@ pub enum TargetArch {
     #[default]
     X86_64,
     RiscV64,
+    AArch64,
 }
 
 impl TargetArch {
     /// 期望的目标处理器架构（如果修改了枚举，那一定要修改这里）
-    pub const EXPECTED: [&'static str; 2] = ["x86_64", "riscv64"];
+    pub const EXPECTED: [&'static str; 3] = ["x86_64", "riscv64", "aarch64"];
 }
 
 impl TryFrom<&str> for TargetArch {
@@ -20,6 +21,7 @@ impl TryFrom<&str> for TargetArch {
         match value.trim().to_ascii_lowercase().as_str() {
             "x86_64" => Ok(TargetArch::X86_64),
             "riscv64" => Ok(TargetArch::RiscV64),
+            "aarch64" => Ok(TargetArch::AArch64),
             _ => Err(format!("Unknown target arch: {}", value)),
         }
     }
@@ -30,6 +32,7 @@ impl From<TargetArch> for &str {
         match val {
             TargetArch::X86_64 => "x86_64",
             TargetArch::RiscV64 => "riscv64",
+            TargetArch::AArch64 => "aarch64",
         }
     }
 }
@@ -87,6 +90,9 @@ mod tests {
 
         let riscv64 = TargetArch::try_from("riscv64").unwrap();
         assert_eq!(riscv64, TargetArch::RiscV64);
+
+        let aarch64 = TargetArch::try_from("aarch64").unwrap();
+        assert_eq!(aarch64, TargetArch::AArch64);
     }
 
     #[test]

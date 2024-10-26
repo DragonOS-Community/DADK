@@ -6,18 +6,18 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use dadk_config::user::UserCleanLevel;
 use log::{debug, error, info, warn};
 
 use crate::{
-    console::{clean::CleanLevel, Action},
-    context::DadkUserExecuteContext,
+    context::{Action, DadkUserExecuteContext},
     executor::cache::CacheDir,
     parser::{
         task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
         task_log::{BuildStatus, InstallStatus, TaskLog},
     },
     scheduler::{SchedEntities, SchedEntity},
-    utils::file::FileUtils,
+    utils::{file::FileUtils, path::abs_path},
 };
 
 use self::cache::{CacheDirType, TaskDataDir};
@@ -133,8 +133,6 @@ impl Executor {
                 task_log.clean_build_status();
                 task_log.clean_install_status();
             }
-
-            _ => {}
         }
 
         self.task_data_dir
@@ -165,9 +163,6 @@ impl Executor {
                         e
                     );
                 }
-            }
-            _ => {
-                error!("Unsupported action: {:?}", self.action);
             }
         }
 
@@ -234,7 +229,7 @@ impl Executor {
             in_dragonos_path = in_dragonos_path[count_leading_slashes..].to_string();
         }
         // 拼接最终的安装路径
-        let install_path = self.dragonos_sysroot.join(in_dragonos_path);
+        let install_path = abs_path(&self.dragonos_sysroot.join(in_dragonos_path));
         debug!("install_path: {:?}", install_path);
         // 创建安装路径
         std::fs::create_dir_all(&install_path).map_err(|e| {
@@ -257,7 +252,7 @@ impl Executor {
 
     fn clean(&self) -> Result<(), ExecutorError> {
         let level = if let Action::Clean(l) = self.action {
-            l.level
+            l
         } else {
             panic!(
                 "BUG: clean() called with non-clean action. executor details: {:?}",
@@ -265,15 +260,17 @@ impl Executor {
             );
         };
         info!(
-            "Cleaning task: {}, level={level}",
+            "Cleaning task: {}, level={level:?}",
             self.entity.task().name_version()
         );
 
         let r: Result<(), ExecutorError> = match level {
-            CleanLevel::All => self.clean_all(),
-            CleanLevel::Src => self.clean_src(),
-            CleanLevel::Target => self.clean_target(),
-            CleanLevel::Cache => self.clean_cache(),
+            UserCleanLevel::All => self.clean_all(),
+            UserCleanLevel::InSrc => self.clean_src(),
+            UserCleanLevel::Output => {
+                self.clean_target()?;
+                self.clean_cache()
+            }
         };
 
         if let Err(e) = r {
