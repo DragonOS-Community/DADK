@@ -259,7 +259,6 @@ impl Parser {
             name: dadk_user_config.standard_config.name,
             version: dadk_user_config.standard_config.version,
             description: dadk_user_config.standard_config.description,
-            rust_target: dadk_user_config.standard_config.rust_target,
             task_type: TaskType::try_from(dadk_user_config.task_type_config)?,
             depends: dadk_user_config.depends_config.depends,
             build: BuildConfig::from(dadk_user_config.build_config),

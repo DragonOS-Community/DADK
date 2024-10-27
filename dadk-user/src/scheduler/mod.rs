@@ -41,8 +41,6 @@ pub struct InnerEntity {
     indegree: usize,
     /// 子节点
     children: Vec<Arc<SchedEntity>>,
-    /// target管理
-    target: Option<Target>,
 }
 
 /// # 调度实体
@@ -92,11 +90,6 @@ impl SchedEntity {
     /// 获取入度
     pub fn indegree(&self) -> usize {
         self.inner.lock().unwrap().indegree
-    }
-
-    /// 获取target
-    pub fn target(&self) -> Option<Target> {
-        self.inner.lock().unwrap().target.clone()
     }
 
     /// 当前任务完成后，所有子节点入度减1
@@ -367,7 +360,6 @@ impl Scheduler {
         let id: i32 = self.generate_task_id();
         let indegree: usize = 0;
         let children = Vec::new();
-        let target = self.generate_task_target(&path, &task.rust_target)?;
         let entity = Arc::new(SchedEntity {
             inner: Mutex::new(InnerEntity {
                 id,
@@ -375,7 +367,6 @@ impl Scheduler {
                 file_path: path.clone(),
                 indegree,
                 children,
-                target,
             }),
         });
         let name_version = (entity.task().name.clone(), entity.task().version.clone());

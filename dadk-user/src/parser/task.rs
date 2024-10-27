@@ -31,8 +31,6 @@ pub struct DADKTask {
     pub version: String,
     /// 包的描述
     pub description: String,
-    /// 编译target
-    pub rust_target: Option<String>,
     /// 任务类型
     pub task_type: TaskType,
     /// 依赖的包
@@ -64,7 +62,6 @@ impl DADKTask {
         name: String,
         version: String,
         description: String,
-        rust_target: Option<String>,
         task_type: TaskType,
         depends: Vec<Dependency>,
         build: BuildConfig,
@@ -79,7 +76,6 @@ impl DADKTask {
             name,
             version,
             description,
-            rust_target,
             task_type,
             depends,
             build,
@@ -127,9 +123,6 @@ impl DADKTask {
         self.name = self.name.trim().to_string();
         self.version = self.version.trim().to_string();
         self.description = self.description.trim().to_string();
-        if let Some(target) = &self.rust_target {
-            self.rust_target = Some(target.trim().to_string());
-        };
         self.task_type.trim();
         self.build.trim();
         self.install.trim();
@@ -244,7 +237,6 @@ impl PartialEq for DADKTask {
         self.name == other.name
             && self.version == other.version
             && self.description == other.description
-            && self.rust_target == other.rust_target
             && self.build_once == other.build_once
             && self.install_once == other.install_once
             && self.target_arch == other.target_arch
