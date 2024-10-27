@@ -3,7 +3,7 @@
 //! 用于解析配置文件，生成任务列表
 //!
 //! 您需要指定一个配置文件目录，解析器会自动解析该目录下的所有配置文件。
-//! 软件包的配置文件必须以`.dadk`作为后缀名，内容格式为json。
+//! 软件包的配置文件格式为toml
 //!
 //! ## 简介
 //!
@@ -11,31 +11,52 @@
 //!
 //! ## 配置文件格式
 //!
-//! ```json
-//! {
-//!     "name": "软件包名称",
-//!     "version": "软件包版本",
-//!     "description": "软件包描述",
-//!     "task_type": {任务类型（该部分详见`TaskType`的文档）},
-//!     "depends": [{依赖项（该部分详见Dependency的文档）}],
-//!     "build": {构建配置（该部分详见BuildConfig的文档）},
-//!     "install": {安装配置（该部分详见InstallConfig的文档）},
-//!     "envs" : [{ "key": "环境变量名", "value": "环境变量值" }]
-//!     "build_once": (可选) 是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果。
-//! }
+//! ```toml
+//! name = "test_git"
+//! version = "0.1.0"
+//! description = ""
+//! build_once = true
+//! install_once = true
+//! target_arch = ["x86_64"]
+//!
+//! [task_type]
+//! type = "build_from_source"
+//! source = "git"
+//! source_path = "https://git.mirrors.dragonos.org.cn/DragonOS-Community/test_git.git"
+//! revison = "01cdc56863"
+//! branch = "test"
+//!
+//! [build]
+//! build-command = "make instal"
+//!
+//! [install]
+//! in_dragonos_path = "/bin"
+//!
+//! [clean]
+//! clean-command = "make clean"
+//!
+//! [depends]
+//! depend1 = "0.1.1"
+//! depend2 = "0.1.2"
+//!
+//! [envs]
+//! PATH = "/usr/bin"
+//! LD_LIBRARY_PATH = "/usr/lib"
+
 use std::{
     fmt::Debug,
     fs::{DirEntry, ReadDir},
     path::PathBuf,
 };
 
-use log::{debug, error, info};
-
 use self::task::DADKTask;
+use config::DADKUserConfig;
+use log::{debug, error, info};
+use task::{BuildConfig, CleanConfig, InstallConfig, TaskType};
+use toml::Table;
+mod config;
 pub mod task;
 pub mod task_log;
-#[cfg(test)]
-mod tests;
 
 /// # 配置解析器
 ///
@@ -67,16 +88,16 @@ impl Debug for ParserError {
                     write!(f, "IO Error while parsing config files: {}", e)
                 }
             }
-            InnerParserError::JsonError(e) => {
+            InnerParserError::TomlError(e) => {
                 if let Some(config_file) = &self.config_file {
                     write!(
                         f,
-                        "Json Error while parsing config file {}: {}",
+                        "Toml Error while parsing config file {}: {}",
                         config_file.display(),
                         e
                     )
                 } else {
-                    write!(f, "Json Error while parsing config file: {}", e)
+                    write!(f, "Toml Error while parsing config file: {}", e)
                 }
             }
             InnerParserError::TaskError(e) => {
@@ -98,7 +119,7 @@ impl Debug for ParserError {
 #[derive(Debug)]
 pub enum InnerParserError {
     IoError(std::io::Error),
-    JsonError(serde_json::Error),
+    TomlError(toml::de::Error),
     TaskError(String),
 }
 
@@ -203,16 +224,8 @@ impl Parser {
     /// * `Ok(DADKTask)` - 生成好的任务
     /// * `Err(ParserError)` - 解析错误
     pub(super) fn parse_config_file(&self, config_file: &PathBuf) -> Result<DADKTask, ParserError> {
-        let content = std::fs::read_to_string(config_file).map_err(|e| ParserError {
-            config_file: Some(config_file.clone()),
-            error: InnerParserError::IoError(e),
-        })?;
-
-        // 从json字符串中解析出DADKTask
-        let mut task: DADKTask = serde_json::from_str(&content).map_err(|e| ParserError {
-            config_file: Some(config_file.clone()),
-            error: InnerParserError::JsonError(e),
-        })?;
+        // 从toml文件中解析出DADKTask
+        let mut task: DADKTask = Self::parse_toml_file(config_file)?;
 
         debug!("Parsed config file {}: {:?}", config_file.display(), task);
 
@@ -226,5 +239,36 @@ impl Parser {
         })?;
 
         return Ok(task);
+    }
+
+    /// 解析toml文件，生成DADKTask
+    pub fn parse_toml_file(config_file: &PathBuf) -> Result<DADKTask, ParserError> {
+        let content = std::fs::read_to_string(config_file).map_err(|e| ParserError {
+            config_file: Some(config_file.clone()),
+            error: InnerParserError::IoError(e),
+        })?;
+
+        let table = content.parse::<Table>().map_err(|e| ParserError {
+            config_file: Some(config_file.clone()),
+            error: InnerParserError::TomlError(e),
+        })?;
+
+        let dadk_user_config = DADKUserConfig::parse(config_file, &table)?;
+
+        Ok(DADKTask {
+            name: dadk_user_config.standard_config.name,
+            version: dadk_user_config.standard_config.version,
+            description: dadk_user_config.standard_config.description,
+            rust_target: dadk_user_config.standard_config.rust_target,
+            task_type: TaskType::try_from(dadk_user_config.task_type_config)?,
+            depends: dadk_user_config.depends_config.depends,
+            build: BuildConfig::from(dadk_user_config.build_config),
+            install: InstallConfig::from(dadk_user_config.install_config),
+            clean: CleanConfig::from(dadk_user_config.clean_config),
+            envs: dadk_user_config.envs_config.envs,
+            build_once: dadk_user_config.standard_config.build_once,
+            install_once: dadk_user_config.standard_config.install_once,
+            target_arch: dadk_user_config.standard_config.target_arch,
+        })
     }
 }

@@ -19,8 +19,8 @@ use super::*;
 fn should_not_run_task_only_riscv64_on_x86_64(ctx: &DadkExecuteContextTestBuildX86_64V1) {
     let config_file = ctx
         .base_context()
-        .config_v1_dir()
-        .join("app_target_arch_riscv64_only_0_1_0.dadk");
+        .config_v2_dir()
+        .join("app_target_arch_riscv64_only_0_2_0.toml");
     let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
@@ -60,8 +60,8 @@ fn should_not_run_task_only_riscv64_on_x86_64(ctx: &DadkExecuteContextTestBuildX
 fn should_not_run_task_only_x86_64_on_riscv64(ctx: &DadkExecuteContextTestBuildRiscV64V1) {
     let config_file = ctx
         .base_context()
-        .config_v1_dir()
-        .join("app_target_arch_x86_64_only_0_1_0.dadk");
+        .config_v2_dir()
+        .join("app_target_arch_x86_64_only_0_2_0.toml");
     let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
@@ -101,8 +101,8 @@ fn should_not_run_task_only_x86_64_on_riscv64(ctx: &DadkExecuteContextTestBuildR
 fn should_run_task_include_x86_64_on_x86_64(ctx: &DadkExecuteContextTestBuildX86_64V1) {
     let config_file = ctx
         .base_context()
-        .config_v1_dir()
-        .join("app_all_target_arch_0_1_0.dadk");
+        .config_v2_dir()
+        .join("app_all_target_arch_0_2_0.toml");
     let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
@@ -134,8 +134,8 @@ fn should_run_task_include_x86_64_on_x86_64(ctx: &DadkExecuteContextTestBuildX86
 fn should_run_task_include_riscv64_on_riscv64(ctx: &DadkExecuteContextTestBuildRiscV64V1) {
     let config_file = ctx
         .base_context()
-        .config_v1_dir()
-        .join("app_all_target_arch_0_1_0.dadk");
+        .config_v2_dir()
+        .join("app_all_target_arch_0_2_0.toml");
     let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
@@ -161,11 +161,11 @@ fn should_run_task_include_riscv64_on_riscv64(ctx: &DadkExecuteContextTestBuildR
     assert!(entity.is_ok(), "Add task should return ok: {:?}", entity);
 }
 
-/// 确保文件 app_all_target_arch_0_1_0.dadk 包含了所有的目标架构
+/// 确保文件 app_all_target_arch_0_2_0.toml 包含了所有的目标架构
 #[test_context(BaseGlobalTestContext)]
 #[test]
 fn ensure_all_target_arch_testcase_v1(ctx: &BaseGlobalTestContext) {
-    let config_file = ctx.config_v1_dir().join("app_all_target_arch_0_1_0.dadk");
+    let config_file = ctx.config_v2_dir().join("app_all_target_arch_0_2_0.toml");
     let task = Parser::new(ctx.config_v1_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();

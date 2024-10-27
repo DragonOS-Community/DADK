@@ -88,6 +88,7 @@
 
 #[macro_use]
 extern crate lazy_static;
+pub extern crate clap;
 extern crate log;
 extern crate serde;
 extern crate serde_json;
@@ -104,7 +105,7 @@ use parser::task::DADKTask;
 use crate::scheduler::Scheduler;
 
 pub mod context;
-mod executor;
+pub mod executor;
 pub mod parser;
 mod scheduler;
 pub mod static_resources;

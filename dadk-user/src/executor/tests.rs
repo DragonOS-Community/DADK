@@ -48,8 +48,8 @@ fn setup_executor<T: TestContextExt>(config_file: PathBuf, ctx: &T) -> Executor 
 fn set_local_env(ctx: &DadkExecuteContextTestBuildX86_64V1) {
     let config_file_path = ctx
         .base_context()
-        .config_v1_dir()
-        .join("app_normal_with_env_0_1_0.dadk");
+        .config_v2_dir()
+        .join("app_normal_with_env_0_2_0.toml");
     let mut executor = setup_executor(config_file_path, ctx);
 
     let r = executor.prepare_local_env();
@@ -70,8 +70,8 @@ fn set_local_env(ctx: &DadkExecuteContextTestBuildX86_64V1) {
 fn execute_should_capture_error(ctx: &DadkExecuteContextTestBuildX86_64V1) {
     let config_file_path = ctx
         .base_context()
-        .config_v1_dir()
-        .join("app_normal_with_env_fail_0_1_0.dadk");
+        .config_v2_dir()
+        .join("app_normal_with_env_fail_0_2_0.toml");
     let mut executor = setup_executor(config_file_path, ctx);
 
     let r = executor.prepare_local_env();

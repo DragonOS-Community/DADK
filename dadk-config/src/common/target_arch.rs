@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// 目标处理器架构
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, PartialOrd, Ord)]
 pub enum TargetArch {
     #[default]
     X86_64,
