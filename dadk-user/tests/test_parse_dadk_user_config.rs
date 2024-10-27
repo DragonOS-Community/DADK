@@ -31,7 +31,7 @@ fn test_parse_dadk_user_config_build_local(ctx: &mut DadkUserTestContext) {
     let r = Parser::parse_toml_file(&config_file);
     assert!(r.is_ok());
     let mut parsed_dadk_task = r.unwrap();
-    let mut dadk_task = DADKTask {
+    let mut expected_dadk_task = DADKTask {
         name: "test_local".to_string(),
         version: "0.2.0".to_string(),
         description: "".to_string(),
@@ -62,16 +62,16 @@ fn test_parse_dadk_user_config_build_local(ctx: &mut DadkUserTestContext) {
     };
 
     parsed_dadk_task.target_arch.sort();
-    dadk_task.target_arch.sort();
+    expected_dadk_task.target_arch.sort();
     parsed_dadk_task.depends.sort();
-    dadk_task.depends.sort();
+    expected_dadk_task.depends.sort();
     if let Some(envs) = &mut parsed_dadk_task.envs {
         envs.sort();
     }
-    if let Some(envs) = &mut dadk_task.envs {
+    if let Some(envs) = &mut expected_dadk_task.envs {
         envs.sort();
     }
-    assert_eq!(parsed_dadk_task, dadk_task)
+    assert_eq!(parsed_dadk_task, expected_dadk_task)
 }
 
 #[test_context(DadkUserTestContext)]
@@ -83,7 +83,7 @@ fn test_parse_dadk_user_config_build_git(ctx: &mut DadkUserTestContext) {
     let r = Parser::parse_toml_file(&config_file);
     assert!(r.is_ok());
     let mut parsed_dadk_task = r.unwrap();
-    let mut dadk_task = DADKTask {
+    let mut expected_dadk_task = DADKTask {
         name: "test_git".to_string(),
         version: "0.2.0".to_string(),
         description: "".to_string(),
@@ -116,16 +116,16 @@ fn test_parse_dadk_user_config_build_git(ctx: &mut DadkUserTestContext) {
     };
 
     parsed_dadk_task.target_arch.sort();
-    dadk_task.target_arch.sort();
+    expected_dadk_task.target_arch.sort();
     parsed_dadk_task.depends.sort();
-    dadk_task.depends.sort();
+    expected_dadk_task.depends.sort();
     if let Some(envs) = &mut parsed_dadk_task.envs {
         envs.sort();
     }
-    if let Some(envs) = &mut dadk_task.envs {
+    if let Some(envs) = &mut expected_dadk_task.envs {
         envs.sort();
     }
-    assert_eq!(parsed_dadk_task, dadk_task)
+    assert_eq!(parsed_dadk_task, expected_dadk_task)
 }
 
 #[test_context(DadkUserTestContext)]
@@ -137,7 +137,7 @@ fn test_parse_dadk_user_config_build_archive(ctx: &mut DadkUserTestContext) {
     let r = Parser::parse_toml_file(&config_file);
     assert!(r.is_ok());
     let mut parsed_dadk_task = r.unwrap();
-    let mut dadk_task = DADKTask {
+    let mut expected_dadk_task = DADKTask {
         name: "test_archive".to_string(),
         version: "0.2.0".to_string(),
         description: "".to_string(),
@@ -168,16 +168,16 @@ fn test_parse_dadk_user_config_build_archive(ctx: &mut DadkUserTestContext) {
     };
 
     parsed_dadk_task.target_arch.sort();
-    dadk_task.target_arch.sort();
+    expected_dadk_task.target_arch.sort();
     parsed_dadk_task.depends.sort();
-    dadk_task.depends.sort();
+    expected_dadk_task.depends.sort();
     if let Some(envs) = &mut parsed_dadk_task.envs {
         envs.sort();
     }
-    if let Some(envs) = &mut dadk_task.envs {
+    if let Some(envs) = &mut expected_dadk_task.envs {
         envs.sort();
     }
-    assert_eq!(parsed_dadk_task, dadk_task)
+    assert_eq!(parsed_dadk_task, expected_dadk_task)
 }
 
 #[test_context(DadkUserTestContext)]
@@ -189,7 +189,7 @@ fn test_parse_dadk_user_config_install_local(ctx: &mut DadkUserTestContext) {
     let r = Parser::parse_toml_file(&config_file);
     assert!(r.is_ok());
     let mut parsed_dadk_task = r.unwrap();
-    let mut dadk_task = DADKTask {
+    let mut expected_dadk_task = DADKTask {
         name: "test_local".to_string(),
         version: "0.2.0".to_string(),
         description: "".to_string(),
@@ -220,16 +220,16 @@ fn test_parse_dadk_user_config_install_local(ctx: &mut DadkUserTestContext) {
     };
 
     parsed_dadk_task.target_arch.sort();
-    dadk_task.target_arch.sort();
+    expected_dadk_task.target_arch.sort();
     parsed_dadk_task.depends.sort();
-    dadk_task.depends.sort();
+    expected_dadk_task.depends.sort();
     if let Some(envs) = &mut parsed_dadk_task.envs {
         envs.sort();
     }
-    if let Some(envs) = &mut dadk_task.envs {
+    if let Some(envs) = &mut expected_dadk_task.envs {
         envs.sort();
     }
-    assert_eq!(parsed_dadk_task, dadk_task)
+    assert_eq!(parsed_dadk_task, expected_dadk_task)
 }
 
 #[test_context(DadkUserTestContext)]
@@ -241,7 +241,7 @@ fn test_parse_dadk_user_config_install_archive(ctx: &mut DadkUserTestContext) {
     let r = Parser::parse_toml_file(&config_file);
     assert!(r.is_ok());
     let mut parsed_dadk_task = r.unwrap();
-    let mut dadk_task = DADKTask {
+    let mut expected_dadk_task = DADKTask {
         name: "test_archive".to_string(),
         version: "0.2.0".to_string(),
         description: "".to_string(),
@@ -272,14 +272,14 @@ fn test_parse_dadk_user_config_install_archive(ctx: &mut DadkUserTestContext) {
     };
 
     parsed_dadk_task.target_arch.sort();
-    dadk_task.target_arch.sort();
+    expected_dadk_task.target_arch.sort();
     parsed_dadk_task.depends.sort();
-    dadk_task.depends.sort();
+    expected_dadk_task.depends.sort();
     if let Some(envs) = &mut parsed_dadk_task.envs {
         envs.sort();
     }
-    if let Some(envs) = &mut dadk_task.envs {
+    if let Some(envs) = &mut expected_dadk_task.envs {
         envs.sort();
     }
-    assert_eq!(parsed_dadk_task, dadk_task)
+    assert_eq!(parsed_dadk_task, expected_dadk_task)
 }
