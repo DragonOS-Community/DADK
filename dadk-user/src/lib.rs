@@ -107,7 +107,7 @@ use crate::{
 
 pub mod console;
 mod context;
-mod executor;
+pub mod executor;
 pub mod parser;
 mod scheduler;
 pub mod static_resources;

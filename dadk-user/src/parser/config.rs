@@ -179,11 +179,9 @@ impl DADKUserStandardConfig {
                 let mut target_arch_vec = Vec::new();
                 for value in value_vec {
                     let target_arch =
-                        TargetArch::try_from(value.to_string().as_str()).map_err(|e| {
-                            ParserError {
-                                config_file: None,
-                                error: InnerParserError::TaskError(e),
-                            }
+                        TargetArch::try_from(value.as_str().unwrap()).map_err(|e| ParserError {
+                            config_file: Some(config_file.clone()),
+                            error: InnerParserError::TomlError(toml::de::Error::custom(e)),
                         })?;
                     target_arch_vec.push(target_arch);
                 }
@@ -348,7 +346,7 @@ impl DADKUserDependsConfig {
             .iter()
             .map(|(key, value)| Dependency {
                 name: key.clone(),
-                version: value.to_string(),
+                version: value.as_str().unwrap().to_string(),
             })
             .collect::<Vec<Dependency>>();
         Ok(Self { depends })
@@ -373,7 +371,7 @@ impl DADKUserEnvsConfig {
                     .iter()
                     .map(|(key, value)| TaskEnv {
                         key: key.clone(),
-                        value: value.to_string(),
+                        value: value.as_str().unwrap().to_string(),
                     })
                     .collect::<Vec<TaskEnv>>(),
             )
@@ -398,13 +396,13 @@ impl TomlValueParser {
             config_file: Some(config_file.clone()),
             error: InnerParserError::TomlError(toml::de::Error::missing_field(key)),
         })?;
-        Ok(value.to_string())
+        Ok(value.as_str().unwrap().to_string())
     }
 
     // 解析Option<String>类型的值
     fn parse_option_string(table: &toml::value::Table, key: &'static str) -> Option<String> {
         let value = table.get(key);
-        value.map(|v| v.to_string())
+        value.map(|v| v.as_str().unwrap().to_string())
     }
 
     // 解析Table类型的值

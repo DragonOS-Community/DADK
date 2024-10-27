@@ -238,6 +238,24 @@ impl DADKTask {
     }
 }
 
+impl PartialEq for DADKTask {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.description == other.description
+            && self.rust_target == other.rust_target
+            && self.build_once == other.build_once
+            && self.install_once == other.install_once
+            && self.target_arch == other.target_arch
+            && self.task_type == other.task_type
+            && self.build == other.build
+            && self.install == other.install
+            && self.clean == other.clean
+            && self.depends == other.depends
+            && self.envs == other.envs
+    }
+}
+
 /// @brief 构建配置
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BuildConfig {
@@ -336,7 +354,7 @@ impl From<DADKUserCleanConfig> for CleanConfig {
 }
 
 /// @brief 依赖项
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dependency {
     pub name: String,
     pub version: String,
@@ -515,7 +533,7 @@ impl PrebuiltSource {
 /// # 任务环境变量
 ///
 /// 任务执行时的环境变量.这个环境变量是在当前任务执行时设置的，不会影响到其他任务
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TaskEnv {
     pub key: String,
     pub value: String,
@@ -549,7 +567,7 @@ impl TaskEnv {
 }
 
 /// 目标处理器架构
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TargetArch {
     Aarch64,
     X86_64,

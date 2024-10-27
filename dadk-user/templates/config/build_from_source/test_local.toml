@@ -1,5 +1,5 @@
 name = "test_local"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 build-once = true
 install-once = true
@@ -11,7 +11,7 @@ source = "local"
 source-path = "apps/test"
 
 [build]
-build-command = "make instal"
+build-command = "make install"
 
 [install]
 in-dragonos-path = "/bin"
