@@ -1,8 +1,16 @@
 use std::path::PathBuf;
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
+
+use super::{
+    config::{
+        DADKUserBuildConfig, DADKUserCleanConfig, DADKUserConfigKey, DADKUserInstallConfig,
+        DADKUserTaskType,
+    },
+    InnerParserError, ParserError,
+};
 
 // 对于生成的包名和版本号，需要进行替换的字符。
 pub static NAME_VERSION_REPLACE_TABLE: [(&str, &str); 6] = [
@@ -254,6 +262,14 @@ impl BuildConfig {
     }
 }
 
+impl From<DADKUserBuildConfig> for BuildConfig {
+    fn from(value: DADKUserBuildConfig) -> Self {
+        return BuildConfig {
+            build_command: value.build_command,
+        };
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InstallConfig {
     /// 安装到DragonOS内的目录
@@ -279,6 +295,14 @@ impl InstallConfig {
     pub fn trim(&mut self) {}
 }
 
+impl From<DADKUserInstallConfig> for InstallConfig {
+    fn from(value: DADKUserInstallConfig) -> Self {
+        return InstallConfig {
+            in_dragonos_path: (value.in_dragonos_path),
+        };
+    }
+}
+
 /// # 清理配置
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CleanConfig {
@@ -300,6 +324,14 @@ impl CleanConfig {
         if let Some(clean_command) = &mut self.clean_command {
             *clean_command = clean_command.trim().to_string();
         }
+    }
+}
+
+impl From<DADKUserCleanConfig> for CleanConfig {
+    fn from(value: DADKUserCleanConfig) -> Self {
+        return CleanConfig {
+            clean_command: value.clean_command,
+        };
     }
 }
 
@@ -357,6 +389,72 @@ impl TaskType {
         match self {
             TaskType::BuildFromSource(source) => source.trim(),
             TaskType::InstallFromPrebuilt(source) => source.trim(),
+        }
+    }
+}
+
+impl TryFrom<DADKUserTaskType> for TaskType {
+    type Error = ParserError;
+    fn try_from(dadk_user_task_type: DADKUserTaskType) -> Result<Self, Self::Error> {
+        let task_type = DADKUserConfigKey::try_from(dadk_user_task_type.task_type.as_str())
+            .map_err(|mut e| {
+                e.config_file = Some(dadk_user_task_type.config_file.clone());
+                e
+            })?;
+
+        let source =
+            DADKUserConfigKey::try_from(dadk_user_task_type.source.as_str()).map_err(|mut e| {
+                e.config_file = Some(dadk_user_task_type.config_file.clone());
+                e
+            })?;
+
+        match task_type {
+            DADKUserConfigKey::BuildFromSource => match source {
+                DADKUserConfigKey::Git => {
+                    Ok(TaskType::BuildFromSource(CodeSource::Git(GitSource::new(
+                        dadk_user_task_type.source_path,
+                        dadk_user_task_type.branch,
+                        dadk_user_task_type.revision,
+                    ))))
+                }
+                DADKUserConfigKey::Local => Ok(TaskType::BuildFromSource(CodeSource::Local(
+                    LocalSource::new(PathBuf::from(dadk_user_task_type.source_path)),
+                ))),
+                DADKUserConfigKey::Archive => Ok(TaskType::BuildFromSource(CodeSource::Archive(
+                    ArchiveSource::new(dadk_user_task_type.source_path),
+                ))),
+                _ => Err(ParserError {
+                    config_file: Some(dadk_user_task_type.config_file),
+                    error: InnerParserError::TomlError(toml::de::Error::custom(format!(
+                        "Unknown source: {}",
+                        dadk_user_task_type.source
+                    ))),
+                }),
+            },
+            DADKUserConfigKey::InstallFromPrebuilt => match source {
+                DADKUserConfigKey::Local => {
+                    Ok(TaskType::InstallFromPrebuilt(PrebuiltSource::Local(
+                        LocalSource::new(PathBuf::from(dadk_user_task_type.source_path)),
+                    )))
+                }
+                DADKUserConfigKey::Archive => Ok(TaskType::InstallFromPrebuilt(
+                    PrebuiltSource::Archive(ArchiveSource::new(dadk_user_task_type.source_path)),
+                )),
+                _ => Err(ParserError {
+                    config_file: Some(dadk_user_task_type.config_file),
+                    error: InnerParserError::TomlError(toml::de::Error::custom(format!(
+                        "Unknown source: {}",
+                        dadk_user_task_type.source
+                    ))),
+                }),
+            },
+            _ => Err(ParserError {
+                config_file: Some(dadk_user_task_type.config_file),
+                error: InnerParserError::TomlError(toml::de::Error::custom(format!(
+                    "Unknown task type: {}",
+                    dadk_user_task_type.task_type
+                ))),
+            }),
         }
     }
 }
