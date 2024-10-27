@@ -1,0 +1,28 @@
+name = "test_local"
+version = "0.2.0"
+description = ""
+build-once = true
+install-once = true
+target-arch = ["x86_64"]
+
+[task-type]
+type = "build_from_source"
+source = "local"
+source-path = "apps/test"
+
+[build]
+build-command = "make install"
+
+[install]
+in-dragonos-path = "/bin"
+
+[clean]
+clean-command = "make clean"
+
+[depends]
+depend1 = "0.1.1"
+depend2 = "0.1.2"
+
+[envs]
+PATH = "/usr/bin"
+LD_LIBRARY_PATH = "/usr/lib"

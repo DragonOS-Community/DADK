@@ -10,6 +10,7 @@ pub struct BaseGlobalTestContext {
 
 impl BaseGlobalTestContext {
     const CONFIG_V1_DIR: &'static str = "tests/data/dadk_config_v1";
+    const CONFIG_V2_DIR: &'static str = "tests/data/dadk_config_v2";
     const FAKE_DRAGONOS_SYSROOT: &'static str = "tests/data/fake_dragonos_sysroot";
     const FAKE_DADK_CACHE_ROOT: &'static str = "tests/data/fake_dadk_cache_root";
 
@@ -26,6 +27,10 @@ impl BaseGlobalTestContext {
     /// 获取`xxx.dadk`配置文件的目录
     pub fn config_v1_dir(&self) -> PathBuf {
         self.abs_path(Self::CONFIG_V1_DIR)
+    }
+
+    pub fn config_v2_dir(&self) -> PathBuf {
+        self.abs_path(Self::CONFIG_V2_DIR)
     }
 
     fn ensure_fake_dragonos_dir_exist(&self) {

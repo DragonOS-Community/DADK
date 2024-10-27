@@ -1,0 +1,26 @@
+name = "app_target_arch_x86_64_only"
+version = "0.2.0"
+description = "An app only target to x86_64"
+build-once = false
+install-once = false
+target-arch = ["x86_64"]
+
+[task-type]
+type = "build_from_source"
+source = "git"
+source-path = "1"
+branch = "1"
+revision = ""
+
+[build]
+build-command = "1"
+
+[install]
+in-dragonos-path = "/"
+
+[clean]
+clean-command = "1"
+
+[depends]
+
+[envs]
