@@ -1,14 +1,15 @@
-use console::parse_commandline_args;
-use dadk_user::dadk_user_main;
-use log::info;
+use context::build_exec_context;
+
+mod actions;
+mod console;
+mod context;
+mod utils;
 
 extern crate anyhow;
 
-mod console;
-
 pub fn dadk_main() {
-    let args = parse_commandline_args();
-    info!("DADK run with args: {:?}", &args);
-
-    dadk_user_main(args);
+    // dadk_user_main();
+    let exec_ctx = build_exec_context().expect("Failed to build execution context");
+    log::debug!("Execution context: {:?}", exec_ctx);
+    actions::run(exec_ctx);
 }

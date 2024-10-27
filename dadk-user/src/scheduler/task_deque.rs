@@ -4,7 +4,7 @@ use std::{
     thread::JoinHandle,
 };
 
-use crate::{console::Action, scheduler::TID_EID};
+use crate::{context::Action, scheduler::TID_EID};
 
 use super::{SchedEntity, Scheduler};
 

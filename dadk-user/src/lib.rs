@@ -98,30 +98,20 @@ extern crate test_base;
 
 use std::{path::PathBuf, process::exit, sync::Arc};
 
+use context::DadkUserExecuteContext;
 use log::info;
 use parser::task::DADKTask;
 
-use crate::{
-    console::CommandLineArgs, context::DadkUserExecuteContextBuilder, scheduler::Scheduler,
-};
+use crate::scheduler::Scheduler;
 
-pub mod console;
-mod context;
+pub mod context;
 pub mod executor;
 pub mod parser;
 mod scheduler;
 pub mod static_resources;
 mod utils;
 
-pub fn dadk_user_main(args: CommandLineArgs) {
-    let context = DadkUserExecuteContextBuilder::default()
-        .sysroot_dir(args.sysroot_dir)
-        .config_dir(args.config_dir)
-        .action(args.action)
-        .thread_num(args.thread)
-        .cache_dir(args.cache_dir)
-        .build()
-        .expect("Failed to build execute context");
+pub fn dadk_user_main(context: DadkUserExecuteContext) {
     let context = Arc::new(context);
     context.init(context.clone());
     // DragonOS sysroot在主机上的路径

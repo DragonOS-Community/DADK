@@ -11,7 +11,7 @@ use crate::{
         task_log::TaskLog,
     },
     scheduler::SchedEntity,
-    utils::lazy_init::Lazy,
+    utils::{lazy_init::Lazy, path::abs_path},
 };
 
 use super::ExecutorError;
@@ -143,8 +143,7 @@ impl CacheDir {
                 )
             }
         };
-
-        return PathBuf::from(cache_dir);
+        abs_path(&PathBuf::from(cache_dir))
     }
 
     pub fn build_dir(entity: Arc<SchedEntity>) -> Result<PathBuf, ExecutorError> {

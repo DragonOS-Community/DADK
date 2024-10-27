@@ -4,8 +4,10 @@ version = "0.1.11"
 edition = "2021"
 
 [dependencies]
+anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
 chrono = { version = "=0.4.35", features = ["serde"] }
 clap = { version = "=4.5.20", features = ["derive"] }
+dadk-config = { path = "../dadk-config" }
 derive_builder = "0.20.0"
 lazy_static = "1.4.0"
 log = "0.4.17"

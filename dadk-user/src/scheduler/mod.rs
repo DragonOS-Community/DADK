@@ -13,8 +13,7 @@ use std::{
 use log::{error, info};
 
 use crate::{
-    console::Action,
-    context::DadkUserExecuteContext,
+    context::{Action, DadkUserExecuteContext},
     executor::{target::Target, Executor},
     parser::task::DADKTask,
 };
@@ -450,7 +449,6 @@ impl Scheduler {
                 self.run_with_topo_sort()?;
             }
             Action::Clean(_) => self.run_without_topo_sort()?,
-            _ => unimplemented!(),
         }
 
         return Ok(());

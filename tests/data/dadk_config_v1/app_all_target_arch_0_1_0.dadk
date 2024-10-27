@@ -27,7 +27,6 @@
   "install_once": false,
   "target_arch": [
     "riscv64",
-    "riscv32",
     "x86_64",
     "aarch64"
   ]

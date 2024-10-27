@@ -1,3 +1,4 @@
+use dadk_config::common::target_arch::TargetArch;
 use test_base::{
     global::BaseGlobalTestContext,
     test_context::{self as test_context, test_context},
@@ -7,7 +8,7 @@ use crate::{
     context::{
         DadkExecuteContextTestBuildRiscV64V1, DadkExecuteContextTestBuildX86_64V1, TestContextExt,
     },
-    parser::{task::TargetArch, Parser},
+    parser::Parser,
 };
 
 use super::*;

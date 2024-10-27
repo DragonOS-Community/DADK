@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
+use dadk_config::common::target_arch::TargetArch;
 use serde::de::Error;
 use toml::Value;
 
 use super::{
-    task::{Dependency, TargetArch, TaskEnv},
+    task::{Dependency, TaskEnv},
     InnerParserError, ParserError,
 };
 

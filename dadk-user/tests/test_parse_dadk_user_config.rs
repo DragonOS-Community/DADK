@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 
+use dadk_config::common::target_arch::TargetArch;
 use dadk_user::{
     executor::source::{ArchiveSource, GitSource, LocalSource},
     parser::{
         task::{
             BuildConfig, CleanConfig, CodeSource, DADKTask, Dependency, InstallConfig,
-            PrebuiltSource, TargetArch, TaskEnv, TaskType,
+            PrebuiltSource, TaskEnv, TaskType,
         },
         Parser,
     },
