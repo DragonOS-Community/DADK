@@ -1,17 +1,19 @@
 use std::path::PathBuf;
 
-use dadk_config::common::target_arch::TargetArch;
-use serde::{de::Error, Deserialize, Serialize};
-
 use crate::executor::source::{ArchiveSource, GitSource, LocalSource};
-
-use super::{
-    config::{
-        DADKUserBuildConfig, DADKUserCleanConfig, DADKUserConfigKey, DADKUserInstallConfig,
-        DADKUserTaskType,
+use dadk_config::{
+    common::{
+        target_arch::TargetArch,
+        task::{
+            BuildConfig, CleanConfig, Dependency, InstallConfig, Source, TaskEnv, TaskSource,
+            TaskSourceType,
+        },
     },
-    InnerParserError, ParserError,
+    user::UserConfigFile,
 };
+use serde::{Deserialize, Serialize};
+
+use anyhow::{Ok, Result};
 
 // 对于生成的包名和版本号，需要进行替换的字符。
 pub static NAME_VERSION_REPLACE_TABLE: [(&str, &str); 6] = [
@@ -100,12 +102,12 @@ impl DADKTask {
         vec![Self::default_target_arch()]
     }
 
-    pub fn validate(&mut self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<()> {
         if self.name.is_empty() {
-            return Err("name is empty".to_string());
+            return Err(anyhow::Error::msg("name is empty"));
         }
         if self.version.is_empty() {
-            return Err("version is empty".to_string());
+            return Err(anyhow::Error::msg("version is empty"));
         }
         self.task_type.validate()?;
         self.build.validate()?;
@@ -131,7 +133,7 @@ impl DADKTask {
         self.trim_envs();
     }
 
-    fn validate_depends(&self) -> Result<(), String> {
+    fn validate_depends(&self) -> Result<()> {
         for depend in &self.depends {
             depend.validate()?;
         }
@@ -144,7 +146,7 @@ impl DADKTask {
         }
     }
 
-    fn validate_envs(&self) -> Result<(), String> {
+    fn validate_envs(&self) -> Result<()> {
         if let Some(envs) = &self.envs {
             for env in envs {
                 env.validate()?;
@@ -153,9 +155,9 @@ impl DADKTask {
         return Ok(());
     }
 
-    fn validate_target_arch(&self) -> Result<(), String> {
+    fn validate_target_arch(&self) -> Result<()> {
         if self.target_arch.is_empty() {
-            return Err("target_arch is empty".to_string());
+            return Err(anyhow::Error::msg("target_arch is empty"));
         }
         return Ok(());
     }
@@ -169,18 +171,18 @@ impl DADKTask {
     }
 
     /// 验证任务类型与构建配置是否匹配
-    fn validate_build_type(&self) -> Result<(), String> {
+    fn validate_build_type(&self) -> Result<()> {
         match &self.task_type {
             TaskType::BuildFromSource(_) => {
                 if self.build.build_command.is_none() {
-                    return Err("build command is empty".to_string());
+                    return Err(anyhow::Error::msg("build command is empty"));
                 }
             }
             TaskType::InstallFromPrebuilt(_) => {
                 if self.build.build_command.is_some() {
-                    return Err(
-                        "build command should be empty when install from prebuilt".to_string()
-                    );
+                    return Err(anyhow::Error::msg(
+                        "build command should be empty when install from prebuilt",
+                    ));
                 }
             }
         }
@@ -232,150 +234,24 @@ impl DADKTask {
     }
 }
 
-impl PartialEq for DADKTask {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.version == other.version
-            && self.description == other.description
-            && self.build_once == other.build_once
-            && self.install_once == other.install_once
-            && self.target_arch == other.target_arch
-            && self.task_type == other.task_type
-            && self.build == other.build
-            && self.install == other.install
-            && self.clean == other.clean
-            && self.depends == other.depends
-            && self.envs == other.envs
-    }
-}
+impl TryFrom<UserConfigFile> for DADKTask {
+    type Error = anyhow::Error;
 
-/// @brief 构建配置
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BuildConfig {
-    /// 构建命令
-    pub build_command: Option<String>,
-}
-
-impl BuildConfig {
-    #[allow(dead_code)]
-    pub fn new(build_command: Option<String>) -> Self {
-        Self { build_command }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {
-        if let Some(build_command) = &mut self.build_command {
-            *build_command = build_command.trim().to_string();
-        }
-    }
-}
-
-impl From<DADKUserBuildConfig> for BuildConfig {
-    fn from(value: DADKUserBuildConfig) -> Self {
-        return BuildConfig {
-            build_command: value.build_command,
-        };
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct InstallConfig {
-    /// 安装到DragonOS内的目录
-    pub in_dragonos_path: Option<PathBuf>,
-}
-
-impl InstallConfig {
-    #[allow(dead_code)]
-    pub fn new(in_dragonos_path: Option<PathBuf>) -> Self {
-        Self { in_dragonos_path }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        if self.in_dragonos_path.is_none() {
-            return Ok(());
-        }
-        if self.in_dragonos_path.as_ref().unwrap().is_relative() {
-            return Err("InstallConfig: in_dragonos_path should be an Absolute path".to_string());
-        }
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {}
-}
-
-impl From<DADKUserInstallConfig> for InstallConfig {
-    fn from(value: DADKUserInstallConfig) -> Self {
-        return InstallConfig {
-            in_dragonos_path: (value.in_dragonos_path),
-        };
-    }
-}
-
-/// # 清理配置
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CleanConfig {
-    /// 清理命令
-    pub clean_command: Option<String>,
-}
-
-impl CleanConfig {
-    #[allow(dead_code)]
-    pub fn new(clean_command: Option<String>) -> Self {
-        Self { clean_command }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {
-        if let Some(clean_command) = &mut self.clean_command {
-            *clean_command = clean_command.trim().to_string();
-        }
-    }
-}
-
-impl From<DADKUserCleanConfig> for CleanConfig {
-    fn from(value: DADKUserCleanConfig) -> Self {
-        return CleanConfig {
-            clean_command: value.clean_command,
-        };
-    }
-}
-
-/// @brief 依赖项
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Dependency {
-    pub name: String,
-    pub version: String,
-}
-
-impl Dependency {
-    #[allow(dead_code)]
-    pub fn new(name: String, version: String) -> Self {
-        Self { name, version }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        if self.name.is_empty() {
-            return Err("name is empty".to_string());
-        }
-        if self.version.is_empty() {
-            return Err("version is empty".to_string());
-        }
-        return Ok(());
-    }
-
-    pub fn trim(&mut self) {
-        self.name = self.name.trim().to_string();
-        self.version = self.version.trim().to_string();
-    }
-
-    pub fn name_version(&self) -> String {
-        return format!("{}-{}", self.name, self.version);
+    fn try_from(user_config: UserConfigFile) -> Result<Self> {
+        Ok(DADKTask {
+            name: user_config.name,
+            version: user_config.version,
+            description: user_config.description,
+            task_type: TaskType::try_from(user_config.task_source)?,
+            depends: user_config.depend,
+            build: user_config.build,
+            install: user_config.install,
+            clean: user_config.clean,
+            envs: Some(user_config.env),
+            build_once: user_config.build_once,
+            install_once: user_config.install_once,
+            target_arch: user_config.target_arch,
+        })
     }
 }
 
@@ -389,7 +265,7 @@ pub enum TaskType {
 }
 
 impl TaskType {
-    pub fn validate(&mut self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<()> {
         match self {
             TaskType::BuildFromSource(source) => source.validate(),
             TaskType::InstallFromPrebuilt(source) => source.validate(),
@@ -404,68 +280,34 @@ impl TaskType {
     }
 }
 
-impl TryFrom<DADKUserTaskType> for TaskType {
-    type Error = ParserError;
-    fn try_from(dadk_user_task_type: DADKUserTaskType) -> Result<Self, Self::Error> {
-        let task_type = DADKUserConfigKey::try_from(dadk_user_task_type.task_type.as_str())
-            .map_err(|mut e| {
-                e.config_file = Some(dadk_user_task_type.config_file.clone());
-                e
-            })?;
-
-        let source =
-            DADKUserConfigKey::try_from(dadk_user_task_type.source.as_str()).map_err(|mut e| {
-                e.config_file = Some(dadk_user_task_type.config_file.clone());
-                e
-            })?;
-
-        match task_type {
-            DADKUserConfigKey::BuildFromSource => match source {
-                DADKUserConfigKey::Git => {
-                    Ok(TaskType::BuildFromSource(CodeSource::Git(GitSource::new(
-                        dadk_user_task_type.source_path,
-                        dadk_user_task_type.branch,
-                        dadk_user_task_type.revision,
-                    ))))
-                }
-                DADKUserConfigKey::Local => Ok(TaskType::BuildFromSource(CodeSource::Local(
-                    LocalSource::new(PathBuf::from(dadk_user_task_type.source_path)),
+impl TryFrom<TaskSource> for TaskType {
+    type Error = anyhow::Error;
+    fn try_from(task_source: TaskSource) -> Result<Self> {
+        match task_source.source_type {
+            TaskSourceType::BuildFromSource => match task_source.source {
+                Source::Git => Ok(TaskType::BuildFromSource(CodeSource::Git(GitSource::new(
+                    task_source.source_path,
+                    task_source.branch,
+                    task_source.revision,
+                )))),
+                Source::Local => Ok(TaskType::BuildFromSource(CodeSource::Local(
+                    LocalSource::new(PathBuf::from(task_source.source_path)),
                 ))),
-                DADKUserConfigKey::Archive => Ok(TaskType::BuildFromSource(CodeSource::Archive(
-                    ArchiveSource::new(dadk_user_task_type.source_path),
+                Source::Archive => Ok(TaskType::BuildFromSource(CodeSource::Archive(
+                    ArchiveSource::new(task_source.source_path),
                 ))),
-                _ => Err(ParserError {
-                    config_file: Some(dadk_user_task_type.config_file),
-                    error: InnerParserError::TomlError(toml::de::Error::custom(format!(
-                        "Unknown source: {}",
-                        dadk_user_task_type.source
-                    ))),
-                }),
             },
-            DADKUserConfigKey::InstallFromPrebuilt => match source {
-                DADKUserConfigKey::Local => {
-                    Ok(TaskType::InstallFromPrebuilt(PrebuiltSource::Local(
-                        LocalSource::new(PathBuf::from(dadk_user_task_type.source_path)),
-                    )))
-                }
-                DADKUserConfigKey::Archive => Ok(TaskType::InstallFromPrebuilt(
-                    PrebuiltSource::Archive(ArchiveSource::new(dadk_user_task_type.source_path)),
+            TaskSourceType::InstallFromPrebuilt => match task_source.source {
+                Source::Git => Err(anyhow::Error::msg(
+                    "InstallFromPrebuild doesn't support Git",
                 )),
-                _ => Err(ParserError {
-                    config_file: Some(dadk_user_task_type.config_file),
-                    error: InnerParserError::TomlError(toml::de::Error::custom(format!(
-                        "Unknown source: {}",
-                        dadk_user_task_type.source
-                    ))),
-                }),
-            },
-            _ => Err(ParserError {
-                config_file: Some(dadk_user_task_type.config_file),
-                error: InnerParserError::TomlError(toml::de::Error::custom(format!(
-                    "Unknown task type: {}",
-                    dadk_user_task_type.task_type
+                Source::Local => Ok(TaskType::InstallFromPrebuilt(PrebuiltSource::Local(
+                    LocalSource::new(PathBuf::from(task_source.source_path)),
                 ))),
-            }),
+                Source::Archive => Ok(TaskType::InstallFromPrebuilt(PrebuiltSource::Archive(
+                    ArchiveSource::new(task_source.source_path),
+                ))),
+            },
         }
     }
 }
@@ -482,7 +324,7 @@ pub enum CodeSource {
 }
 
 impl CodeSource {
-    pub fn validate(&mut self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<()> {
         match self {
             CodeSource::Git(source) => source.validate(),
             CodeSource::Local(source) => source.validate(Some(false)),
@@ -508,7 +350,7 @@ pub enum PrebuiltSource {
 }
 
 impl PrebuiltSource {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<()> {
         match self {
             PrebuiltSource::Archive(source) => source.validate(),
             PrebuiltSource::Local(source) => source.validate(None),
@@ -520,41 +362,5 @@ impl PrebuiltSource {
             PrebuiltSource::Archive(source) => source.trim(),
             PrebuiltSource::Local(source) => source.trim(),
         }
-    }
-}
-
-/// # 任务环境变量
-///
-/// 任务执行时的环境变量.这个环境变量是在当前任务执行时设置的，不会影响到其他任务
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TaskEnv {
-    pub key: String,
-    pub value: String,
-}
-
-impl TaskEnv {
-    #[allow(dead_code)]
-    pub fn new(key: String, value: String) -> Self {
-        Self { key, value }
-    }
-
-    pub fn key(&self) -> &str {
-        &self.key
-    }
-
-    pub fn value(&self) -> &str {
-        &self.value
-    }
-
-    pub fn trim(&mut self) {
-        self.key = self.key.trim().to_string();
-        self.value = self.value.trim().to_string();
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        if self.key.is_empty() {
-            return Err("Env: key is empty".to_string());
-        }
-        return Ok(());
     }
 }

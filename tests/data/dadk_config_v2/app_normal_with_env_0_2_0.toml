@@ -5,7 +5,7 @@ build-once = false
 install-once = false
 target-arch = ["x86_64"]              # Assuming this is the default target architecture
 
-[task-type]
+[task-source]
 type = "build_from_source"
 source = "local"
 source-path = "tests/data/apps/app_normal_with_env"
@@ -19,7 +19,6 @@ in-dragonos-path = "/"
 [clean]
 clean-command = ""
 
-[depends]
-
-[envs]
-CC = "abc-gcc"
+[[env]]
+key = "CC"
+value = "abc-gcc"

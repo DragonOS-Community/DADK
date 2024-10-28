@@ -14,7 +14,7 @@ use log::{error, info};
 
 use crate::{
     context::{Action, DadkUserExecuteContext},
-    executor::{target::Target, Executor},
+    executor::Executor,
     parser::task::DADKTask,
 };
 
@@ -393,40 +393,6 @@ impl Scheduler {
     fn generate_task_id(&self) -> i32 {
         static TASK_ID: AtomicI32 = AtomicI32::new(0);
         return TASK_ID.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn generate_task_target(
-        &self,
-        path: &PathBuf,
-        rust_target: &Option<String>,
-    ) -> Result<Option<Target>, SchedulerError> {
-        if let Some(rust_target) = rust_target {
-            // 如果rust_target字段不为none，说明需要target管理
-            // 获取dadk任务路径，用于生成临时dadk文件名
-            let file_str = path.as_path().to_str().unwrap();
-            let tmp_dadk_path = Target::tmp_dadk(file_str);
-            let tmp_dadk_str = tmp_dadk_path.as_path().to_str().unwrap();
-
-            if Target::is_user_target(rust_target) {
-                // 如果target文件是用户自己的
-                if let Ok(target_path) = Target::user_target_path(rust_target) {
-                    let target_path_str = target_path.as_path().to_str().unwrap();
-                    let index = target_path_str.rfind('/').unwrap();
-                    let target_name = target_path_str[index + 1..].to_string();
-                    let tmp_target = PathBuf::from(format!("{}{}", tmp_dadk_str, target_name));
-                    return Ok(Some(Target::new(tmp_target)));
-                } else {
-                    return Err(SchedulerError::TaskError(
-                        "The path of target file is invalid.".to_string(),
-                    ));
-                }
-            } else {
-                // 如果target文件是内置的
-                let tmp_target = PathBuf::from(format!("{}{}.json", tmp_dadk_str, rust_target));
-                return Ok(Some(Target::new(tmp_target)));
-            }
-        }
-        return Ok(None);
     }
 
     /// # 执行调度器中的所有任务

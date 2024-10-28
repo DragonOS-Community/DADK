@@ -1,15 +1,15 @@
-name = "test_git"
+name = "userapp_test_git"
 version = "0.2.0"
 description = ""
 build-once = true
 install-once = true
 target-arch = ["x86_64"]
 
-[task-type]
+[task-source]
 type = "build_from_source"
 source = "git"
 source-path = "https://git.mirrors.dragonos.org.cn/DragonOS-Community/test_git.git"
-revison = "01cdc56863"
+revision = "01cdc56863"
 branch = "test"
 
 [build]
@@ -21,10 +21,18 @@ in-dragonos-path = "/bin"
 [clean]
 clean-command = "make clean"
 
-[depends]
-depend1 = "0.1.1"
-depend2 = "0.1.2"
+[[depend]]
+name = "depend1"
+version = "0.1.1"
 
-[envs]
-PATH = "/usr/bin"
-LD_LIBRARY_PATH = "/usr/lib"
+[[depend]]
+name = "depend2"
+version = "0.1.2"
+
+[[env]]
+key = "PATH"
+value = "/usr/bin"
+
+[[env]]
+key = "LD_LIBRARY_PATH"
+value = "/usr/lib"

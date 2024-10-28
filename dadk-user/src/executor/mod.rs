@@ -12,20 +12,19 @@ use crate::{
     context::{Action, DadkUserExecuteContext},
     executor::cache::CacheDir,
     parser::{
-        task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
+        task::{CodeSource, PrebuiltSource, TaskType},
         task_log::{BuildStatus, InstallStatus, TaskLog},
     },
     scheduler::{SchedEntities, SchedEntity},
     utils::{file::FileUtils, path::abs_path},
 };
 
-use dadk_config::user::UserCleanLevel;
+use dadk_config::{common::task::TaskEnv, user::UserCleanLevel};
 
 use self::cache::{CacheDirType, TaskDataDir};
 
 pub mod cache;
 pub mod source;
-pub mod target;
 #[cfg(test)]
 mod tests;
 

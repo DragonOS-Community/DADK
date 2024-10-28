@@ -50,11 +50,10 @@ use std::{
 };
 
 use self::task::DADKTask;
-use config::DADKUserConfig;
+use anyhow::Result;
+use dadk_config::user::UserConfigFile;
 use log::{debug, error, info};
-use task::{BuildConfig, CleanConfig, InstallConfig, TaskType};
-use toml::Table;
-mod config;
+
 pub mod task;
 pub mod task_log;
 
@@ -141,10 +140,10 @@ impl Parser {
     ///
     /// * `Ok(Vec<(PathBuf, DADKTask)>)` - 任务列表(配置文件路径, 任务)
     /// * `Err(ParserError)` - 解析错误
-    pub fn parse(&mut self) -> Result<Vec<(PathBuf, DADKTask)>, ParserError> {
+    pub fn parse(&mut self) -> Result<Vec<(PathBuf, DADKTask)>> {
         self.scan_config_files()?;
         info!("Found {} config files", self.config_files.len());
-        let r: Result<Vec<(PathBuf, DADKTask)>, ParserError> = self.gen_tasks();
+        let r: Result<Vec<(PathBuf, DADKTask)>> = self.gen_tasks();
         if r.is_err() {
             error!("Error while parsing config files: {:?}", r);
         }
@@ -152,7 +151,7 @@ impl Parser {
     }
 
     /// # 扫描配置文件目录，找到所有配置文件
-    fn scan_config_files(&mut self) -> Result<(), ParserError> {
+    fn scan_config_files(&mut self) -> Result<()> {
         info!("Scanning config files in {}", self.config_dir.display());
 
         let mut dir_queue: Vec<PathBuf> = Vec::new();
@@ -162,16 +161,10 @@ impl Parser {
         while !dir_queue.is_empty() {
             // 扫描目录，找到所有*.dadk文件
             let dir = dir_queue.pop().unwrap();
-            let entries: ReadDir = std::fs::read_dir(&dir).map_err(|e| ParserError {
-                config_file: None,
-                error: InnerParserError::IoError(e),
-            })?;
+            let entries: ReadDir = std::fs::read_dir(&dir)?;
 
             for entry in entries {
-                let entry: DirEntry = entry.map_err(|e| ParserError {
-                    config_file: None,
-                    error: InnerParserError::IoError(e),
-                })?;
+                let entry: DirEntry = entry?;
 
                 let path: PathBuf = entry.path();
                 if path.is_dir() {
@@ -202,7 +195,7 @@ impl Parser {
     ///
     /// * `Ok(Vec<DADKTask>)` - 任务列表
     /// * `Err(ParserError)` - 解析错误
-    fn gen_tasks(&self) -> Result<Vec<(PathBuf, DADKTask)>, ParserError> {
+    fn gen_tasks(&self) -> Result<Vec<(PathBuf, DADKTask)>> {
         let mut result_vec = Vec::new();
         for config_file in &self.config_files {
             let task: DADKTask = self.parse_config_file(config_file)?;
@@ -223,7 +216,7 @@ impl Parser {
     ///
     /// * `Ok(DADKTask)` - 生成好的任务
     /// * `Err(ParserError)` - 解析错误
-    pub(super) fn parse_config_file(&self, config_file: &PathBuf) -> Result<DADKTask, ParserError> {
+    pub(super) fn parse_config_file(&self, config_file: &PathBuf) -> Result<DADKTask> {
         // 从toml文件中解析出DADKTask
         let mut task: DADKTask = Self::parse_toml_file(config_file)?;
 
@@ -233,41 +226,14 @@ impl Parser {
         task.trim();
 
         // 校验DADKTask的参数是否合法
-        task.validate().map_err(|e| ParserError {
-            config_file: Some(config_file.clone()),
-            error: InnerParserError::TaskError(e),
-        })?;
+        task.validate()?;
 
         return Ok(task);
     }
 
     /// 解析toml文件，生成DADKTask
-    pub fn parse_toml_file(config_file: &PathBuf) -> Result<DADKTask, ParserError> {
-        let content = std::fs::read_to_string(config_file).map_err(|e| ParserError {
-            config_file: Some(config_file.clone()),
-            error: InnerParserError::IoError(e),
-        })?;
-
-        let table = content.parse::<Table>().map_err(|e| ParserError {
-            config_file: Some(config_file.clone()),
-            error: InnerParserError::TomlError(e),
-        })?;
-
-        let dadk_user_config = DADKUserConfig::parse(config_file, &table)?;
-
-        Ok(DADKTask {
-            name: dadk_user_config.standard_config.name,
-            version: dadk_user_config.standard_config.version,
-            description: dadk_user_config.standard_config.description,
-            task_type: TaskType::try_from(dadk_user_config.task_type_config)?,
-            depends: dadk_user_config.depends_config.depends,
-            build: BuildConfig::from(dadk_user_config.build_config),
-            install: InstallConfig::from(dadk_user_config.install_config),
-            clean: CleanConfig::from(dadk_user_config.clean_config),
-            envs: dadk_user_config.envs_config.envs,
-            build_once: dadk_user_config.standard_config.build_once,
-            install_once: dadk_user_config.standard_config.install_once,
-            target_arch: dadk_user_config.standard_config.target_arch,
-        })
+    pub fn parse_toml_file(config_file: &PathBuf) -> Result<DADKTask> {
+        let dadk_user_config = UserConfigFile::load(config_file)?;
+        DADKTask::try_from(dadk_user_config)
     }
 }

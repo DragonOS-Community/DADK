@@ -5,12 +5,11 @@ build-once = false
 install-once = false
 target-arch = ["riscv64", "x86_64", "aarch64"]
 
-[task-type]
+[task-source]
 type = "build_from_source"
 source = "git"
 source-path = "1"
 branch = "1"
-revision = ""
 
 [build]
 build-command = "1"
@@ -20,7 +19,3 @@ in-dragonos-path = "/"
 
 [clean]
 clean-command = "1"
-
-[depends]
-
-[envs]
