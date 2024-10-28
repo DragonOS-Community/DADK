@@ -1,16 +1,21 @@
 pub mod fstype;
+pub mod partition;
+
 mod utils;
 
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use fstype::FsType;
+use partition::PartitionConfig;
 use serde::Deserialize;
 
 /// rootfs配置文件
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RootFSConfigFile {
     pub metadata: RootFSMeta,
+    #[serde(default)]
+    pub partition: PartitionConfig,
 }
 
 impl RootFSConfigFile {

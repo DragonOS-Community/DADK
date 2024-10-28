@@ -83,4 +83,6 @@ impl DADKExecContext {
     pub fn target_arch(&self) -> TargetArch {
         self.manifest.metadata.arch
     }
+
+    pub fn disk_image_path
 }
