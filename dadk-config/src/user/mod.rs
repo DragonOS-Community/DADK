@@ -45,11 +45,11 @@ pub struct UserConfigFile {
     pub env: Vec<TaskEnv>,
 
     /// (可选) 是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果。
-    #[serde(rename = "build-once")]
+    #[serde(rename = "build-once", default = "default_false")]
     pub build_once: bool,
 
     /// (可选) 是否只安装一次，如果为true，DADK会在安装成功后，不再重复安装。
-    #[serde(rename = "install-once")]
+    #[serde(rename = "install-once", default = "default_false")]
     pub install_once: bool,
 
     #[serde(rename = "target-arch")]
@@ -74,4 +74,8 @@ fn default_empty_env() -> Vec<TaskEnv> {
 
 fn default_empty_dep() -> Vec<Dependency> {
     vec![]
+}
+
+fn default_false() -> bool {
+    false
 }

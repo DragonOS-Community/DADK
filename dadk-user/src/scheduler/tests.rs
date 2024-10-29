@@ -1,4 +1,4 @@
-use dadk_config::{common::target_arch::TargetArch, user::UserConfigFile};
+use dadk_config::common::target_arch::TargetArch;
 use test_base::{
     global::BaseGlobalTestContext,
     test_context::{self as test_context, test_context},
