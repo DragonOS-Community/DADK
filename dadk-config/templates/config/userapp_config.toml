@@ -22,8 +22,8 @@ target-arch = ["x86_64"]
 [task-source]
 
 # 构建类型
-# 可选值："build_from_source", "install_from_prebuilt"
-type = "build_from_source"
+# 可选值："build-from_source", "install-from-prebuilt"
+type = "build-from-source"
 
 # 构建来源
 # "build_from_source" 可选值："git", "local", "archive"
@@ -57,20 +57,20 @@ in-dragonos-path = "/bin"
 clean-command = "make clean"
 
 # （可选）依赖项
-# 注意：如果没有依赖项，忽略此项，不允许只留一个[[depend]]
-[[depend]]
+# 注意：如果没有依赖项，忽略此项，不允许只留一个[[depends]]
+[[depends]]
 name = "depend1"
 version = "0.1.1"
 
-[[depend]]
+[[depends]]
 name = "depend2"
 version = "0.1.2"
 
 # （可选）环境变量
-[[env]]
+[[envs]]
 key = "PATH"
 value = "/usr/bin"
 
-[[env]]
+[[envs]]
 key = "LD_LIBRARY_PATH"
 value = "/usr/lib"

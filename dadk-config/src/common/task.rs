@@ -19,10 +19,10 @@ pub struct TaskSource {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TaskSourceType {
     /// 从源码构建
-    #[serde(rename = "build_from_source")]
+    #[serde(rename = "build-from-source")]
     BuildFromSource,
     /// 从预编译包安装
-    #[serde(rename = "install_from_prebuilt")]
+    #[serde(rename = "install-from-prebuilt")]
     InstallFromPrebuilt,
 }
 

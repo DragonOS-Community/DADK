@@ -41,7 +41,7 @@ fn test_parse_dadk_user_config(ctx: &mut DadkConfigTestContext) {
             branch: None,
             revision: Some("01cdc56863".to_string()),
         },
-        depend: vec![
+        depends: vec![
             Dependency {
                 name: "depend1".to_string(),
                 version: "0.1.1".to_string(),
@@ -54,7 +54,7 @@ fn test_parse_dadk_user_config(ctx: &mut DadkConfigTestContext) {
         build: BuildConfig::new(Some("make install".to_string())),
         install: InstallConfig::new(Some(PathBuf::from("/bin"))),
         clean: CleanConfig::new(Some("make clean".to_string())),
-        env: vec![
+        envs: vec![
             TaskEnv::new("PATH".to_string(), "/usr/bin".to_string()),
             TaskEnv::new("LD_LIBRARY_PATH".to_string(), "/usr/lib".to_string()),
         ],
@@ -63,10 +63,10 @@ fn test_parse_dadk_user_config(ctx: &mut DadkConfigTestContext) {
 
     user_config.target_arch.sort();
     expected_user_config.target_arch.sort();
-    user_config.depend.sort();
-    expected_user_config.depend.sort();
-    user_config.env.sort();
-    expected_user_config.env.sort();
+    user_config.depends.sort();
+    expected_user_config.depends.sort();
+    user_config.envs.sort();
+    expected_user_config.envs.sort();
 
     assert_eq!(user_config, expected_user_config)
 }

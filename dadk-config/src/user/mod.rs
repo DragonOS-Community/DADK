@@ -33,7 +33,7 @@ pub struct UserConfigFile {
     pub task_source: TaskSource,
     /// 依赖的包
     #[serde(default = "default_empty_dep")]
-    pub depend: Vec<Dependency>,
+    pub depends: Vec<Dependency>,
     /// 构建配置
     pub build: BuildConfig,
     /// 安装配置
@@ -42,7 +42,7 @@ pub struct UserConfigFile {
     pub clean: CleanConfig,
     /// 环境变量
     #[serde(default = "default_empty_env")]
-    pub env: Vec<TaskEnv>,
+    pub envs: Vec<TaskEnv>,
 
     /// (可选) 是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果。
     #[serde(rename = "build-once", default = "default_false")]

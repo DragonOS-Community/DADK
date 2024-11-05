@@ -6,7 +6,7 @@ install-once = false
 target-arch = ["riscv64", "x86_64", "aarch64"]
 
 [task-source]
-type = "build_from_source"
+type = "build-from-source"
 source = "git"
 source-path = "1"
 branch = "1"
