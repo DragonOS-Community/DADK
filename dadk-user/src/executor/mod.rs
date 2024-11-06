@@ -4,8 +4,10 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
     sync::{Arc, RwLock},
+    time::SystemTime,
 };
 
+use chrono::{DateTime, Utc};
 use dadk_config::user::UserCleanLevel;
 use log::{debug, error, info, warn};
 
@@ -169,18 +171,27 @@ impl Executor {
         return Ok(());
     }
 
-    /// # 执行build操作
     fn build(&mut self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().build_status() {
-            if *status == BuildStatus::Success && self.entity.task().build_once {
-                info!(
-                    "Task {} has been built successfully, skip build.",
-                    self.entity.task().name_version()
-                );
-                return Ok(());
+            if let Some(build_time) = self.task_log().build_time() {
+                if *status == BuildStatus::Success
+                    && self.entity.task().build_once
+                    && last_modified_time(self.entity.file_path()) < *build_time
+                {
+                    info!(
+                        "Task {} has been built successfully, skip build.",
+                        self.entity.task().name_version()
+                    );
+                    return Ok(());
+                }
             }
         }
 
+        return self.do_build();
+    }
+
+    /// # 执行build操作
+    fn do_build(&mut self) -> Result<(), ExecutorError> {
         self.mv_target_to_tmp()?;
 
         // 确认源文件就绪
@@ -201,18 +212,27 @@ impl Executor {
         return Ok(());
     }
 
-    /// # 执行安装操作，把构建结果安装到DragonOS
     fn install(&self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().install_status() {
-            if *status == InstallStatus::Success && self.entity.task().install_once {
-                info!(
-                    "Task {} has been installed successfully, skip install.",
-                    self.entity.task().name_version()
-                );
-                return Ok(());
+            if let Some(build_time) = self.task_log().build_time() {
+                if *status == InstallStatus::Success
+                    && self.entity.task().install_once
+                    && last_modified_time(self.entity.file_path()) < *build_time
+                {
+                    info!(
+                        "Task {} has been installed successfully, skip install.",
+                        self.entity.task().name_version()
+                    );
+                    return Ok(());
+                }
             }
         }
 
+        return self.do_install();
+    }
+
+    /// # 执行安装操作，把构建结果安装到DragonOS
+    fn do_install(&self) -> Result<(), ExecutorError> {
         let binding = self.entity.task();
         let in_dragonos_path = binding.install.in_dragonos_path.as_ref();
         // 如果没有指定安装路径，则不执行安装
@@ -659,4 +679,28 @@ fn create_global_env_list(
     env_list.add(EnvVar::new("ARCH".to_string(), (*target_arch).into()));
 
     return Ok(env_list);
+}
+
+fn last_modified_time(path: PathBuf) -> DateTime<Utc> {
+    let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
+
+    for entry in std::fs::read_dir(path).unwrap() {
+        if let Ok(entry) = entry {
+            if entry.file_name() == "target" {
+                continue;
+            }
+
+            let metadata = entry.metadata().unwrap();
+            if metadata.is_dir() {
+                last_modified = std::cmp::max(last_modified, last_modified_time(entry.path()));
+            } else {
+                last_modified = std::cmp::max(
+                    last_modified,
+                    DateTime::<Utc>::from(metadata.modified().unwrap()),
+                );
+            }
+        }
+    }
+
+    last_modified
 }
