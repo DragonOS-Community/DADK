@@ -174,9 +174,12 @@ impl Executor {
     fn build(&mut self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().build_status() {
             if let Some(build_time) = self.task_log().build_time() {
+                let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
+                last_modified_time(self.entity.file_path(), &mut last_modified, build_time);
+
                 if *status == BuildStatus::Success
                     && self.entity.task().build_once
-                    && last_modified_time(self.entity.file_path()) < *build_time
+                    && last_modified < *build_time
                 {
                     info!(
                         "Task {} has been built successfully, skip build.",
@@ -215,9 +218,12 @@ impl Executor {
     fn install(&self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().install_status() {
             if let Some(build_time) = self.task_log().build_time() {
+                let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
+                last_modified_time(self.entity.file_path(), &mut last_modified, build_time);
+
                 if *status == InstallStatus::Success
                     && self.entity.task().install_once
-                    && last_modified_time(self.entity.file_path()) < *build_time
+                    && last_modified < *build_time
                 {
                     info!(
                         "Task {} has been installed successfully, skip install.",
@@ -681,26 +687,40 @@ fn create_global_env_list(
     return Ok(env_list);
 }
 
-fn last_modified_time(path: PathBuf) -> DateTime<Utc> {
-    let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
-
-    for entry in std::fs::read_dir(path).unwrap() {
-        if let Ok(entry) = entry {
+/// # 获取文件最后的更新时间
+///
+/// ## 参数
+/// * `path` - 文件路径
+/// * `last_modified` - 最后的更新时间
+/// * `build_time` - 构建时间
+fn last_modified_time(
+    path: PathBuf,
+    last_modified: &mut DateTime<Utc>,
+    build_time: &DateTime<Utc>,
+) {
+    for r in std::fs::read_dir(path).unwrap() {
+        if let Ok(entry) = r {
+            // 忽略编译产物目录
             if entry.file_name() == "target" {
                 continue;
             }
 
+            // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续递归
+            if *last_modified > *build_time {
+                return;
+            }
+
             let metadata = entry.metadata().unwrap();
             if metadata.is_dir() {
-                last_modified = std::cmp::max(last_modified, last_modified_time(entry.path()));
+                // 如果是子目录，则递归找改子目录下的文件最后的更新时间
+                last_modified_time(entry.path(), last_modified, build_time);
             } else {
-                last_modified = std::cmp::max(
-                    last_modified,
+                // 比较文件的修改时间和last_modified，取最大值
+                *last_modified = std::cmp::max(
+                    *last_modified,
                     DateTime::<Utc>::from(metadata.modified().unwrap()),
                 );
             }
         }
     }
-
-    last_modified
 }
