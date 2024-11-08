@@ -21,7 +21,7 @@ fn should_not_run_task_only_riscv64_on_x86_64(ctx: &DadkExecuteContextTestBuildX
         .base_context()
         .config_v2_dir()
         .join("app_target_arch_riscv64_only_0_2_0.toml");
-    let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
+    let task = Parser::new(ctx.base_context().config_v2_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
     assert!(
@@ -62,7 +62,7 @@ fn should_not_run_task_only_x86_64_on_riscv64(ctx: &DadkExecuteContextTestBuildR
         .base_context()
         .config_v2_dir()
         .join("app_target_arch_x86_64_only_0_2_0.toml");
-    let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
+    let task = Parser::new(ctx.base_context().config_v2_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
     assert!(
@@ -103,7 +103,7 @@ fn should_run_task_include_x86_64_on_x86_64(ctx: &DadkExecuteContextTestBuildX86
         .base_context()
         .config_v2_dir()
         .join("app_all_target_arch_0_2_0.toml");
-    let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
+    let task = Parser::new(ctx.base_context().config_v2_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
 
@@ -136,7 +136,7 @@ fn should_run_task_include_riscv64_on_riscv64(ctx: &DadkExecuteContextTestBuildR
         .base_context()
         .config_v2_dir()
         .join("app_all_target_arch_0_2_0.toml");
-    let task = Parser::new(ctx.base_context().config_v1_dir()).parse_config_file(&config_file);
+    let task = Parser::new(ctx.base_context().config_v2_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
 
@@ -166,7 +166,7 @@ fn should_run_task_include_riscv64_on_riscv64(ctx: &DadkExecuteContextTestBuildR
 #[test]
 fn ensure_all_target_arch_testcase_v1(ctx: &BaseGlobalTestContext) {
     let config_file = ctx.config_v2_dir().join("app_all_target_arch_0_2_0.toml");
-    let task = Parser::new(ctx.config_v1_dir()).parse_config_file(&config_file);
+    let task = Parser::new(ctx.config_v2_dir()).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let task = task.unwrap();
 

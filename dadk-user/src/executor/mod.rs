@@ -15,18 +15,19 @@ use crate::{
     context::{Action, DadkUserExecuteContext},
     executor::cache::CacheDir,
     parser::{
-        task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
+        task::{CodeSource, PrebuiltSource, TaskType},
         task_log::{BuildStatus, InstallStatus, TaskLog},
     },
     scheduler::{SchedEntities, SchedEntity},
     utils::{file::FileUtils, path::abs_path},
 };
 
+use dadk_config::common::task::TaskEnv;
+
 use self::cache::{CacheDirType, TaskDataDir};
 
 pub mod cache;
 pub mod source;
-pub mod target;
 #[cfg(test)]
 mod tests;
 
@@ -175,7 +176,7 @@ impl Executor {
         if let Some(status) = self.task_log().build_status() {
             if let Some(build_time) = self.task_log().build_time() {
                 let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
-                last_modified_time(self.entity.file_path(), &mut last_modified, build_time);
+                last_modified_time(&self.entity.file_path(), &mut last_modified, build_time);
 
                 if *status == BuildStatus::Success
                     && self.entity.task().build_once
@@ -195,8 +196,6 @@ impl Executor {
 
     /// # 执行build操作
     fn do_build(&mut self) -> Result<(), ExecutorError> {
-        self.mv_target_to_tmp()?;
-
         // 确认源文件就绪
         self.prepare_input()?;
 
@@ -219,7 +218,7 @@ impl Executor {
         if let Some(status) = self.task_log().install_status() {
             if let Some(build_time) = self.task_log().build_time() {
                 let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
-                last_modified_time(self.entity.file_path(), &mut last_modified, build_time);
+                last_modified_time(&self.entity.file_path(), &mut last_modified, build_time);
 
                 if *status == InstallStatus::Success
                     && self.entity.task().install_once
@@ -267,11 +266,6 @@ impl Executor {
         FileUtils::copy_dir_all(&build_dir, &install_path)
             .map_err(|e| ExecutorError::InstallError(e))?;
         info!("Task {} installed.", self.entity.task().name_version());
-
-        // 安装完后，删除临时target文件
-        if let Some(target) = self.entity.target() {
-            target.clean_tmpdadk()?;
-        }
 
         return Ok(());
     }
@@ -432,9 +426,6 @@ impl Executor {
 
     /// # 准备工作线程本地环境变量
     fn prepare_local_env(&mut self) -> Result<(), ExecutorError> {
-        // 设置本地环境变量
-        self.prepare_target_env()?;
-
         let binding = self.entity.task();
         let task_envs: Option<&Vec<TaskEnv>> = binding.envs.as_ref();
 
@@ -554,30 +545,6 @@ impl Executor {
             return Err(ExecutorError::TaskFailed(errmsg));
         }
     }
-
-    pub fn mv_target_to_tmp(&mut self) -> Result<(), ExecutorError> {
-        if let Some(rust_target) = self.entity.task().rust_target.clone() {
-            // 将target文件拷贝至 /tmp 下对应的dadk文件的临时target文件中
-            self.entity
-                .target()
-                .as_ref()
-                .unwrap()
-                .cp_to_tmp(&rust_target)?;
-        }
-        return Ok(());
-    }
-
-    pub fn prepare_target_env(&mut self) -> Result<(), ExecutorError> {
-        if self.entity.task().rust_target.is_some() {
-            // 如果有dadk任务有rust_target字段，需要设置DADK_RUST_TARGET_FILE环境变量，值为临时target文件路径
-            self.entity
-                .target()
-                .as_ref()
-                .unwrap()
-                .prepare_env(&mut self.local_envs);
-        }
-        return Ok(());
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -694,33 +661,46 @@ fn create_global_env_list(
 /// * `last_modified` - 最后的更新时间
 /// * `build_time` - 构建时间
 fn last_modified_time(
-    path: PathBuf,
+    path: &PathBuf,
     last_modified: &mut DateTime<Utc>,
     build_time: &DateTime<Utc>,
 ) {
-    for r in std::fs::read_dir(path).unwrap() {
-        if let Ok(entry) = r {
-            // 忽略编译产物目录
-            if entry.file_name() == "target" {
-                continue;
-            }
+    let dir_last_modified_time =
+        |path: &PathBuf, last_modified: &mut DateTime<Utc>, build_time: &DateTime<Utc>| {
+            for r in std::fs::read_dir(path).unwrap() {
+                if let Ok(entry) = r {
+                    // 忽略编译产物目录
+                    if entry.file_name() == "target" {
+                        continue;
+                    }
 
-            // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续递归
-            if *last_modified > *build_time {
-                return;
-            }
+                    // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续递归
+                    if *last_modified > *build_time {
+                        return;
+                    }
 
-            let metadata = entry.metadata().unwrap();
-            if metadata.is_dir() {
-                // 如果是子目录，则递归找改子目录下的文件最后的更新时间
-                last_modified_time(entry.path(), last_modified, build_time);
-            } else {
-                // 比较文件的修改时间和last_modified，取最大值
-                *last_modified = std::cmp::max(
-                    *last_modified,
-                    DateTime::<Utc>::from(metadata.modified().unwrap()),
-                );
+                    let metadata = entry.metadata().unwrap();
+                    if metadata.is_dir() {
+                        // 如果是子目录，则递归找改子目录下的文件最后的更新时间
+                        last_modified_time(&entry.path(), last_modified, build_time);
+                    } else {
+                        // 比较文件的修改时间和last_modified，取最大值
+                        *last_modified = std::cmp::max(
+                            *last_modified,
+                            DateTime::<Utc>::from(metadata.modified().unwrap()),
+                        );
+                    }
+                }
             }
-        }
+        };
+
+    let metadata = path.metadata().unwrap();
+    if metadata.is_dir() {
+        dir_last_modified_time(path, last_modified, build_time);
+    } else {
+        *last_modified = std::cmp::max(
+            *last_modified,
+            DateTime::<Utc>::from(metadata.modified().unwrap()),
+        );
     }
 }
