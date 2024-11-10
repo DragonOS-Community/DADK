@@ -177,8 +177,7 @@ impl Executor {
             if let Some(build_time) = self.task_log().build_time() {
                 let last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
                 if *status == BuildStatus::Success
-                    && self.entity.task().build_once
-                    && last_modified < *build_time
+                    && (self.entity.task().build_once || last_modified < *build_time)
                 {
                     info!(
                         "Task {} has been built successfully, skip build.",
@@ -205,7 +204,7 @@ impl Executor {
         // 检查构建结果，如果为空，则抛出警告
         if self.build_dir.is_empty()? {
             warn!(
-                "Task {}: build result is empty, do you forget to copy the result to [$DADK_CURRENT_BUILD_DIR]?",
+                "Task {}: build result is empty, do you forget to copy` the result to [$DADK_CURRENT_BUILD_DIR]?",
                 self.entity.task().name_version(),
             );
         }
@@ -217,8 +216,7 @@ impl Executor {
             if let Some(build_time) = self.task_log().build_time() {
                 let last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
                 if *status == InstallStatus::Success
-                    && self.entity.task().install_once
-                    && last_modified < *build_time
+                    && (self.entity.task().install_once || last_modified < *build_time)
                 {
                     info!(
                         "Task {} has been installed successfully, skip install.",
