@@ -1,5 +1,7 @@
 use serde::Deserializer;
 
+use crate::rootfs::RootFSConfigFile;
+
 /// 自定义反序列化函数，用于解析表示磁盘镜像大小的值。
 ///
 /// 此函数支持两种输入格式：
@@ -27,7 +29,7 @@ where
     let value = serde::de::Deserialize::deserialize(deserializer)?;
 
     // 匹配输入值的类型，进行相应的转换
-    match value {
+    let r = match value {
         toml::Value::Integer(num) => {
             // 如果是整数类型，直接转换成usize
             Ok(num as usize)
@@ -38,7 +40,9 @@ where
                 .ok_or_else(|| serde::de::Error::custom("Invalid string for size"))
         }
         _ => Err(serde::de::Error::custom("Invalid type for size")),
-    }
+    };
+
+    r.map(|size| (size + RootFSConfigFile::LBA_SIZE - 1) & !(RootFSConfigFile::LBA_SIZE - 1))
 }
 
 /// Parses a size string with optional unit suffix (K, M, G) into a usize value.

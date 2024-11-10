@@ -19,6 +19,7 @@ pub struct RootFSConfigFile {
 }
 
 impl RootFSConfigFile {
+    pub const LBA_SIZE: usize = 512;
     pub fn load(path: &PathBuf) -> Result<Self> {
         // 读取文件内容
         let content = fs::read_to_string(path)?;
@@ -37,6 +38,7 @@ pub struct RootFSMeta {
     /// rootfs文件系统类型
     pub fs_type: FsType,
     /// rootfs磁盘大小（至少要大于这个值）
+    /// 单位：字节
     #[serde(deserialize_with = "utils::size::deserialize_size")]
     pub size: usize,
 }

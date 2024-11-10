@@ -20,14 +20,13 @@ pub enum PartitionType {
     Gpt,
 }
 
-impl PartitionConfig{
+impl PartitionConfig {
     /// Determines whether a partitioned image should be created.
-    /// 
+    ///
     /// Returns `true` if the partition type is not `None`, otherwise returns `false`.
     pub fn should_create_partitioned_image(&self) -> bool {
         self.partition_type != PartitionType::None
     }
-    
 }
 
 #[cfg(test)]
@@ -42,8 +41,8 @@ mod tests {
         ];
 
         for (config_content, expected_type) in test_cases {
-        let partition_config: PartitionConfig = toml::from_str(config_content).unwrap();
+            let partition_config: PartitionConfig = toml::from_str(config_content).unwrap();
             assert_eq!(partition_config.partition_type, expected_type);
-    }
+        }
     }
 }
