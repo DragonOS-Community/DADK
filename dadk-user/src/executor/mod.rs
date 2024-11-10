@@ -4,8 +4,11 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
     sync::{Arc, RwLock},
+    time::SystemTime,
 };
 
+use chrono::{DateTime, Utc};
+use dadk_config::user::UserCleanLevel;
 use log::{debug, error, info, warn};
 
 use crate::{
@@ -19,7 +22,7 @@ use crate::{
     utils::{file::FileUtils, path::abs_path},
 };
 
-use dadk_config::{common::task::TaskEnv, user::UserCleanLevel};
+use dadk_config::common::task::TaskEnv;
 
 use self::cache::{CacheDirType, TaskDataDir};
 
@@ -169,18 +172,27 @@ impl Executor {
         return Ok(());
     }
 
-    /// # 执行build操作
     fn build(&mut self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().build_status() {
-            if *status == BuildStatus::Success && self.entity.task().build_once {
-                info!(
-                    "Task {} has been built successfully, skip build.",
-                    self.entity.task().name_version()
-                );
-                return Ok(());
+            if let Some(build_time) = self.task_log().build_time() {
+                let last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
+                if *status == BuildStatus::Success
+                    && (self.entity.task().build_once || last_modified < *build_time)
+                {
+                    info!(
+                        "Task {} has been built successfully, skip build.",
+                        self.entity.task().name_version()
+                    );
+                    return Ok(());
+                }
             }
         }
 
+        return self.do_build();
+    }
+
+    /// # 执行build操作
+    fn do_build(&mut self) -> Result<(), ExecutorError> {
         // 确认源文件就绪
         self.prepare_input()?;
 
@@ -199,18 +211,27 @@ impl Executor {
         return Ok(());
     }
 
-    /// # 执行安装操作，把构建结果安装到DragonOS
     fn install(&self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().install_status() {
-            if *status == InstallStatus::Success && self.entity.task().install_once {
-                info!(
-                    "Task {} has been installed successfully, skip install.",
-                    self.entity.task().name_version()
-                );
-                return Ok(());
+            if let Some(build_time) = self.task_log().build_time() {
+                let last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
+                if *status == InstallStatus::Success
+                    && (self.entity.task().install_once || last_modified < *build_time)
+                {
+                    info!(
+                        "Task {} has been installed successfully, skip install.",
+                        self.entity.task().name_version()
+                    );
+                    return Ok(());
+                }
             }
         }
 
+        return self.do_install();
+    }
+
+    /// # 执行安装操作，把构建结果安装到DragonOS
+    fn do_install(&self) -> Result<(), ExecutorError> {
         let binding = self.entity.task();
         let in_dragonos_path = binding.install.in_dragonos_path.as_ref();
         // 如果没有指定安装路径，则不执行安装
@@ -625,4 +646,56 @@ fn create_global_env_list(
     env_list.add(EnvVar::new("ARCH".to_string(), (*target_arch).into()));
 
     return Ok(env_list);
+}
+
+/// # 获取文件最后的更新时间
+///
+/// ## 参数
+/// * `path` - 文件路径
+/// * `last_modified` - 最后的更新时间
+/// * `build_time` - 构建时间
+fn last_modified_time(
+    path: &PathBuf,
+    build_time: &DateTime<Utc>,
+) -> Result<DateTime<Utc>, ExecutorError> {
+    let metadata = path
+        .metadata()
+        .map_err(|e| ExecutorError::InstallError(e.to_string()))?;
+
+    let last_modified = if metadata.is_dir() {
+        let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
+        for r in std::fs::read_dir(path).unwrap() {
+            if let Ok(entry) = r {
+                // 忽略编译产物目录
+                if entry.file_name() == "target" {
+                    continue;
+                }
+
+                let metadata = entry.metadata().unwrap();
+                if metadata.is_dir() {
+                    // 如果是子目录，则递归找改子目录下的文件最后的更新时间
+                    last_modified = std::cmp::max(
+                        last_modified,
+                        last_modified_time(&entry.path(), build_time)?,
+                    );
+                } else {
+                    // 比较文件的修改时间和last_modified，取最大值
+                    last_modified = std::cmp::max(
+                        last_modified,
+                        DateTime::<Utc>::from(metadata.modified().unwrap()),
+                    );
+                }
+
+                // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续递归
+                if last_modified > *build_time {
+                    return Ok(last_modified);
+                }
+            }
+        }
+        last_modified
+    } else {
+        DateTime::<Utc>::from(metadata.modified().unwrap())
+    };
+
+    return Ok(last_modified);
 }
