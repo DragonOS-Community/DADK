@@ -3,10 +3,10 @@ version = "0.2.0"
 description = "A normal app with env which should failed"
 build-once = false
 install-once = false
-target-arch = ["x86_64"]              # Assuming this is the default target architecture
+target-arch = ["x86_64"]                                  # Assuming this is the default target architecture
 
-[task-type]
-type = "build_from_source"
+[task-source]
+type = "build-from-source"
 source = "local"
 source-path = "tests/data/apps/app_normal_with_env_fail"
 
@@ -19,7 +19,6 @@ in-dragonos-path = "/"
 [clean]
 clean-command = ""
 
-[depends]
-
-[envs]
-CC = "abc-gcc1"
+[[envs]]
+key = "CC"
+value = "abc-gcc1"

@@ -14,6 +14,8 @@ use crate::utils::{file::FileUtils, stdio::StdioUtils};
 
 use super::cache::CacheDir;
 
+use anyhow::{Error, Result};
+
 /// # Git源
 ///
 /// 从Git仓库获取源码
@@ -38,9 +40,9 @@ impl GitSource {
     /// # 验证参数合法性
     ///
     /// 仅进行形式校验，不会检查Git仓库是否存在，以及分支是否存在、是否有权限访问等
-    pub fn validate(&mut self) -> Result<(), String> {
+    pub fn validate(&mut self) -> Result<()> {
         if self.url.is_empty() {
-            return Err("url is empty".to_string());
+            return Err(Error::msg("url is empty"));
         }
         // branch和revision不能同时为空
         if self.branch.is_none() && self.revision.is_none() {
@@ -48,17 +50,17 @@ impl GitSource {
         }
         // branch和revision只能同时指定一个
         if self.branch.is_some() && self.revision.is_some() {
-            return Err("branch and revision are both specified".to_string());
+            return Err(Error::msg("branch and revision are both specified"));
         }
 
         if self.branch.is_some() {
             if self.branch.as_ref().unwrap().is_empty() {
-                return Err("branch is empty".to_string());
+                return Err(Error::msg("branch is empty"));
             }
         }
         if self.revision.is_some() {
             if self.revision.as_ref().unwrap().is_empty() {
-                return Err("revision is empty".to_string());
+                return Err(Error::msg("revision is empty"));
             }
         }
         return Ok(());
@@ -460,18 +462,21 @@ impl LocalSource {
         Self { path }
     }
 
-    pub fn validate(&self, expect_file: Option<bool>) -> Result<(), String> {
+    pub fn validate(&self, expect_file: Option<bool>) -> Result<()> {
         if !self.path.exists() {
-            return Err(format!("path {:?} not exists", self.path));
+            return Err(Error::msg(format!("path {:?} not exists", self.path)));
         }
 
         if let Some(expect_file) = expect_file {
             if expect_file && !self.path.is_file() {
-                return Err(format!("path {:?} is not a file", self.path));
+                return Err(Error::msg(format!("path {:?} is not a file", self.path)));
             }
 
             if !expect_file && !self.path.is_dir() {
-                return Err(format!("path {:?} is not a directory", self.path));
+                return Err(Error::msg(format!(
+                    "path {:?} is not a directory",
+                    self.path
+                )));
             }
         }
 
@@ -497,18 +502,21 @@ impl ArchiveSource {
     pub fn new(url: String) -> Self {
         Self { url }
     }
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<()> {
         if self.url.is_empty() {
-            return Err("url is empty".to_string());
+            return Err(Error::msg("url is empty"));
         }
 
         // 判断是一个网址
         if let Ok(url) = Url::parse(&self.url) {
             if url.scheme() != "http" && url.scheme() != "https" {
-                return Err(format!("url {:?} is not a http/https url", self.url));
+                return Err(Error::msg(format!(
+                    "url {:?} is not a http/https url",
+                    self.url
+                )));
             }
         } else {
-            return Err(format!("url {:?} is not a valid url", self.url));
+            return Err(Error::msg(format!("url {:?} is not a valid url", self.url)));
         }
         return Ok(());
     }

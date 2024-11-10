@@ -6,25 +6,25 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use dadk_config::user::UserCleanLevel;
 use log::{debug, error, info, warn};
 
 use crate::{
     context::{Action, DadkUserExecuteContext},
     executor::cache::CacheDir,
     parser::{
-        task::{CodeSource, PrebuiltSource, TaskEnv, TaskType},
+        task::{CodeSource, PrebuiltSource, TaskType},
         task_log::{BuildStatus, InstallStatus, TaskLog},
     },
     scheduler::{SchedEntities, SchedEntity},
     utils::{file::FileUtils, path::abs_path},
 };
 
+use dadk_config::{common::task::TaskEnv, user::UserCleanLevel};
+
 use self::cache::{CacheDirType, TaskDataDir};
 
 pub mod cache;
 pub mod source;
-pub mod target;
 #[cfg(test)]
 mod tests;
 
@@ -181,8 +181,6 @@ impl Executor {
             }
         }
 
-        self.mv_target_to_tmp()?;
-
         // 确认源文件就绪
         self.prepare_input()?;
 
@@ -241,11 +239,6 @@ impl Executor {
         FileUtils::copy_dir_all(&build_dir, &install_path)
             .map_err(|e| ExecutorError::InstallError(e))?;
         info!("Task {} installed.", self.entity.task().name_version());
-
-        // 安装完后，删除临时target文件
-        if let Some(target) = self.entity.target() {
-            target.clean_tmpdadk()?;
-        }
 
         return Ok(());
     }
@@ -406,9 +399,6 @@ impl Executor {
 
     /// # 准备工作线程本地环境变量
     fn prepare_local_env(&mut self) -> Result<(), ExecutorError> {
-        // 设置本地环境变量
-        self.prepare_target_env()?;
-
         let binding = self.entity.task();
         let task_envs: Option<&Vec<TaskEnv>> = binding.envs.as_ref();
 
@@ -527,30 +517,6 @@ impl Executor {
             error!("{errmsg}");
             return Err(ExecutorError::TaskFailed(errmsg));
         }
-    }
-
-    pub fn mv_target_to_tmp(&mut self) -> Result<(), ExecutorError> {
-        if let Some(rust_target) = self.entity.task().rust_target.clone() {
-            // 将target文件拷贝至 /tmp 下对应的dadk文件的临时target文件中
-            self.entity
-                .target()
-                .as_ref()
-                .unwrap()
-                .cp_to_tmp(&rust_target)?;
-        }
-        return Ok(());
-    }
-
-    pub fn prepare_target_env(&mut self) -> Result<(), ExecutorError> {
-        if self.entity.task().rust_target.is_some() {
-            // 如果有dadk任务有rust_target字段，需要设置DADK_RUST_TARGET_FILE环境变量，值为临时target文件路径
-            self.entity
-                .target()
-                .as_ref()
-                .unwrap()
-                .prepare_env(&mut self.local_envs);
-        }
-        return Ok(());
     }
 }
 
