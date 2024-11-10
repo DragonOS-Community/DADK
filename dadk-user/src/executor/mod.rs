@@ -204,7 +204,7 @@ impl Executor {
         // 检查构建结果，如果为空，则抛出警告
         if self.build_dir.is_empty()? {
             warn!(
-                "Task {}: build result is empty, do you forget to copy` the result to [$DADK_CURRENT_BUILD_DIR]?",
+                "Task {}: build result is empty, do you forget to copy the result to [$DADK_CURRENT_BUILD_DIR]?",
                 self.entity.task().name_version(),
             );
         }
