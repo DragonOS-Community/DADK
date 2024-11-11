@@ -30,9 +30,12 @@ pub struct CommandLineArgs {
 
 #[derive(Debug, Subcommand, Clone, PartialEq, Eq)]
 pub enum Action {
+    /// 内核相关操作
     Kernel,
+    /// 对 rootfs 进行操作
     #[command(subcommand, name = "rootfs")]
     Rootfs(RootFSCommand),
+    /// 用户程序构建相关操作
     #[command(subcommand, name = "user")]
     User(UserCommand),
 }

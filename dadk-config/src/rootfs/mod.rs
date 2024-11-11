@@ -1,19 +1,25 @@
 pub mod fstype;
+pub mod partition;
+
 mod utils;
 
 use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use fstype::FsType;
+use partition::PartitionConfig;
 use serde::Deserialize;
 
 /// rootfs配置文件
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RootFSConfigFile {
     pub metadata: RootFSMeta,
+    #[serde(default)]
+    pub partition: PartitionConfig,
 }
 
 impl RootFSConfigFile {
+    pub const LBA_SIZE: usize = 512;
     pub fn load(path: &PathBuf) -> Result<Self> {
         // 读取文件内容
         let content = fs::read_to_string(path)?;
@@ -32,6 +38,7 @@ pub struct RootFSMeta {
     /// rootfs文件系统类型
     pub fs_type: FsType,
     /// rootfs磁盘大小（至少要大于这个值）
+    /// 单位：字节
     #[serde(deserialize_with = "utils::size::deserialize_size")]
     pub size: usize,
 }

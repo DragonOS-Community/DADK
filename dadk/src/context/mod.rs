@@ -83,4 +83,15 @@ impl DADKExecContext {
     pub fn target_arch(&self) -> TargetArch {
         self.manifest.metadata.arch
     }
+
+    /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成
+    pub fn disk_image_path(&self) -> PathBuf {
+        let arch: String = self.target_arch().into();
+        self.workdir().join(format!("bin/disk-image-{}.img", arch))
+    }
+
+    /// 获取磁盘镜像大小
+    pub fn disk_image_size(&self) -> usize {
+        self.rootfs().metadata.size
+    }
 }
