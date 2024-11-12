@@ -5,9 +5,12 @@ use anyhow::{anyhow, Result};
 use dadk_config::rootfs::{fstype::FsType, partition::PartitionType};
 
 use super::loopdev::LoopDeviceBuilder;
-pub(super) fn create(ctx: &DADKExecContext) -> Result<()> {
+pub(super) fn create(ctx: &DADKExecContext, skip_if_exists: bool) -> Result<()> {
     let disk_image_path = ctx.disk_image_path();
     if disk_image_path.exists() {
+        if skip_if_exists {
+            return Ok(());
+        }
         return Err(anyhow!(
             "Disk image already exists: {}",
             disk_image_path.display()
@@ -32,6 +35,24 @@ pub(super) fn create(ctx: &DADKExecContext) -> Result<()> {
         std::fs::remove_file(&disk_image_path).expect("Failed to remove disk image");
     }
     r
+}
+
+pub(super) fn delete(ctx: &DADKExecContext, skip_if_not_exists: bool) -> Result<()> {
+    let disk_image_path = ctx.disk_image_path();
+    if !disk_image_path.exists() {
+        if skip_if_not_exists {
+            return Ok(());
+        }
+        return Err(anyhow!(
+            "Disk image does not exist: {}",
+            disk_image_path.display()
+        ));
+    }
+    disk_path_safety_check(&disk_image_path)?;
+
+    std::fs::remove_file(&disk_image_path)
+        .map_err(|e| anyhow!("Failed to remove disk image: {}", e))?;
+    Ok(())
 }
 
 pub fn mount(ctx: &DADKExecContext) -> Result<()> {
@@ -154,6 +175,7 @@ pub fn umount(ctx: &DADKExecContext) -> Result<()> {
         }
         log::info!("Loop device detached: {:?}", loop_dev_path);
     }
+
     Ok(())
 }
 
