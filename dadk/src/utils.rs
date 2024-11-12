@@ -19,6 +19,7 @@ pub fn abs_path(path: &PathBuf) -> PathBuf {
     if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir().unwrap().join(path)
+        let origin = std::env::current_dir().unwrap().join(path);
+        origin.canonicalize().unwrap_or(origin)
     }
 }

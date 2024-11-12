@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, path::PathBuf, process::Command};
+use std::{fs::File, io::Write, mem::ManuallyDrop, path::PathBuf, process::Command};
 
 use crate::context::DADKExecContext;
 use anyhow::{anyhow, Result};
@@ -22,7 +22,7 @@ pub(super) fn create(ctx: &DADKExecContext) -> Result<()> {
 
     // 判断是否需要分区？
 
-    let r = if ctx.rootfs().partition.should_create_partitioned_image() {
+    let r = if ctx.rootfs().partition.image_should_be_partitioned() {
         create_partitioned_image(ctx, &disk_image_path)
     } else {
         create_unpartitioned_image(ctx, &disk_image_path)
@@ -33,6 +33,130 @@ pub(super) fn create(ctx: &DADKExecContext) -> Result<()> {
     }
     r
 }
+
+pub fn mount(ctx: &DADKExecContext) -> Result<()> {
+    let disk_image_path = ctx.disk_image_path();
+    if !disk_image_path.exists() {
+        return Err(anyhow!(
+            "Disk image does not exist: {}",
+            disk_image_path.display()
+        ));
+    }
+    let disk_mount_path = ctx.disk_mount_path();
+
+    // 尝试创建挂载点
+    std::fs::create_dir_all(&disk_mount_path)
+        .map_err(|e| anyhow!("Failed to create disk mount path: {}", e))?;
+
+    let partitioned = ctx.rootfs().partition.image_should_be_partitioned();
+    log::trace!("Disk image is partitioned: {}", partitioned);
+    if partitioned {
+        mount_partitioned_image(ctx, &disk_image_path, &disk_mount_path)?
+    } else {
+        mount_unpartitioned_image(ctx, &disk_image_path, &disk_mount_path)?
+    }
+    log::info!("Disk image mounted at {}", disk_mount_path.display());
+    Ok(())
+}
+
+fn mount_partitioned_image(
+    ctx: &DADKExecContext,
+    disk_image_path: &PathBuf,
+    disk_mount_path: &PathBuf,
+) -> Result<()> {
+    let mut loop_device = ManuallyDrop::new(
+        LoopDeviceBuilder::new()
+            .img_path(disk_image_path.clone())
+            .build()
+            .map_err(|e| anyhow!("Failed to create loop device: {}", e))?,
+    );
+
+    loop_device
+        .attach()
+        .map_err(|e| anyhow!("Failed to attach loop device: {}", e))?;
+
+    let dev_path = loop_device.partition_path(1)?;
+    mount_unpartitioned_image(ctx, &dev_path, disk_mount_path)?;
+
+    Ok(())
+}
+
+fn mount_unpartitioned_image(
+    _ctx: &DADKExecContext,
+    disk_image_path: &PathBuf,
+    disk_mount_path: &PathBuf,
+) -> Result<()> {
+    let cmd = Command::new("mount")
+        .arg(disk_image_path)
+        .arg(disk_mount_path)
+        .output()
+        .map_err(|e| anyhow!("Failed to mount disk image: {}", e))?;
+    if !cmd.status.success() {
+        return Err(anyhow!(
+            "Failed to mount disk image: {}",
+            String::from_utf8_lossy(&cmd.stderr)
+        ));
+    }
+    Ok(())
+}
+
+pub fn umount(ctx: &DADKExecContext) -> Result<()> {
+    let disk_img_path = ctx.disk_image_path();
+    let disk_mount_path = ctx.disk_mount_path();
+    let mut loop_device = LoopDeviceBuilder::new().img_path(disk_img_path).build();
+
+    let should_detach_loop_device: bool;
+    if let Ok(loop_device) = loop_device.as_mut() {
+        if let Err(e) = loop_device.attach_by_exists() {
+            log::trace!("umount: Failed to attach loop device: {}", e);
+        }
+
+        should_detach_loop_device = loop_device.attached();
+    } else {
+        should_detach_loop_device = false;
+    }
+
+    if disk_mount_path.exists() {
+        let cmd = Command::new("umount")
+            .arg(disk_mount_path)
+            .output()
+            .map_err(|e| anyhow!("Failed to umount disk image: {}", e));
+        match cmd {
+            Ok(cmd) => {
+                if !cmd.status.success() {
+                    let e = anyhow!(
+                        "Failed to umount disk image: {}",
+                        String::from_utf8_lossy(&cmd.stderr)
+                    );
+                    if should_detach_loop_device {
+                        log::error!("{}", e);
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+            Err(e) => {
+                if should_detach_loop_device {
+                    log::error!("{}", e);
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    if let Ok(mut loop_device) = loop_device {
+        let loop_dev_path = loop_device.dev_path().cloned();
+        if let Err(e) = loop_device.detach().map_err(|e| anyhow!("{}", e)) {
+            if ctx.rootfs().partition.image_should_be_partitioned() {
+                return Err(e);
+            }
+        }
+        log::info!("Loop device detached: {:?}", loop_dev_path);
+    }
+    Ok(())
+}
+
 /// Ensures the provided disk image path is not a device node.
 fn disk_path_safety_check(disk_image_path: &PathBuf) -> Result<()> {
     const DONT_ALLOWED_PREFIX: [&str; 5] =
@@ -57,6 +181,9 @@ fn create_partitioned_image(ctx: &DADKExecContext, disk_image_path: &PathBuf) ->
         .img_path(disk_image_path.clone())
         .build()
         .map_err(|e| anyhow!("Failed to create loop device: {}", e))?;
+    loop_device
+        .attach()
+        .map_err(|e| anyhow!("Failed to attach loop device: {}", e))?;
 
     let partition_path = loop_device.partition_path(1)?;
     let fs_type = ctx.rootfs().metadata.fs_type;

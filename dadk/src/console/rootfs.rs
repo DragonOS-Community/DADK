@@ -12,5 +12,5 @@ pub enum RootFSCommand {
     /// 挂载根文件系统（磁盘镜像）
     Mount,
     /// 卸载根文件系统（磁盘镜像）
-    Unmount,
+    Umount,
 }

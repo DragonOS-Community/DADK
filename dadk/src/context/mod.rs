@@ -86,8 +86,19 @@ impl DADKExecContext {
 
     /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成
     pub fn disk_image_path(&self) -> PathBuf {
+        self.workdir()
+            .join(format!("bin/{}.img", self.disk_image_basename()))
+    }
+
+    /// 获取磁盘挂载路径
+    pub fn disk_mount_path(&self) -> PathBuf {
+        self.workdir()
+            .join(format!("bin/mnt/{}", self.disk_image_basename()))
+    }
+
+    fn disk_image_basename(&self) -> String {
         let arch: String = self.target_arch().into();
-        self.workdir().join(format!("bin/disk-image-{}.img", arch))
+        format!("disk-image-{}", arch)
     }
 
     /// 获取磁盘镜像大小
