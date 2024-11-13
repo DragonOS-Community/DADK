@@ -21,10 +21,10 @@ pub enum PartitionType {
 }
 
 impl PartitionConfig {
-    /// Determines whether a partitioned image should be created.
+    /// Determines whether the disk image should be partitioned
     ///
     /// Returns `true` if the partition type is not `None`, otherwise returns `false`.
-    pub fn should_create_partitioned_image(&self) -> bool {
+    pub fn image_should_be_partitioned(&self) -> bool {
         self.partition_type != PartitionType::None
     }
 }

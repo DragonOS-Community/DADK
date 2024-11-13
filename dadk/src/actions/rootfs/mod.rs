@@ -9,7 +9,7 @@ pub(super) fn run(ctx: &DADKExecContext, rootfs_cmd: &RootFSCommand) -> Result<(
         RootFSCommand::Create => disk_img::create(ctx),
         RootFSCommand::Delete => todo!(),
         RootFSCommand::DeleteSysroot => todo!(),
-        RootFSCommand::Mount => todo!(),
-        RootFSCommand::Unmount => todo!(),
+        RootFSCommand::Mount => disk_img::mount(ctx),
+        RootFSCommand::Umount => disk_img::umount(ctx),
     }
 }
