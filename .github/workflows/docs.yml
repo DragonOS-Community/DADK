@@ -74,4 +74,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_DEPLOY_S3_SECRET_KEY }}
       # if: github.ref == 'refs/heads/master' && github.repository  == 'DragonOS-Community/DADK'
       run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pip python3-setuptools
+        python3 -m pip install --user awscli
         aws s3 sync ./.vuepress/dist s3://dragonos-docs/p/dadk --delete
