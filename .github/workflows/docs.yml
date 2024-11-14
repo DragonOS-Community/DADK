@@ -14,15 +14,14 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Setup Node.js environment
-      working-directory: ./docs
       uses: actions/setup-node@v3.7.0
       with:
         node-version: "20.11.0"
 
     - name: Cache dependencies
-      working-directory: ./docs
       id: cache-node-modules
       uses: actions/cache@v3
+      working-directory: ./docs
       env:
         cache-name: cache-node-modules
       with:
@@ -51,9 +50,9 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Cache dependencies
-      working-directory: ./docs
       id: cache-node-modules
       uses: actions/cache@v3
+      working-directory: ./docs
       env:
         cache-name: cache-node-modules
       with:
@@ -61,7 +60,6 @@ jobs:
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('package.json') }}
 
     - name: Setup Node.js environment
-      working-directory: ./docs
       uses: actions/setup-node@v3.7.0
       with:
         node-version: "20.11.0"
