@@ -21,11 +21,10 @@ jobs:
     - name: Cache dependencies
       id: cache-node-modules
       uses: actions/cache@v3
-      working-directory: ./docs
       env:
         cache-name: cache-node-modules
       with:
-        path: ./node_modules
+        path: ./docs/node_modules
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('package.json') }}
 
     - name: echo node version
@@ -52,11 +51,10 @@ jobs:
     - name: Cache dependencies
       id: cache-node-modules
       uses: actions/cache@v3
-      working-directory: ./docs
       env:
         cache-name: cache-node-modules
       with:
-        path: ./node_modules
+        path: ./docs/node_modules
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('package.json') }}
 
     - name: Setup Node.js environment
