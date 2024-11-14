@@ -72,6 +72,6 @@ jobs:
         AWS_ENDPOINT_URL: ${{ secrets.DOCS_DEPLOY_S3_ENDPOINT_URL }}
         AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_DEPLOY_S3_API_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_DEPLOY_S3_SECRET_KEY }}
-      if: github.ref == 'refs/heads/master' && github.repository  == 'DragonOS-Community/DADK'
+      # if: github.ref == 'refs/heads/master' && github.repository  == 'DragonOS-Community/DADK'
       run: |
         aws s3 sync ./.vuepress/dist s3://dragonos-docs/p/dadk --delete
