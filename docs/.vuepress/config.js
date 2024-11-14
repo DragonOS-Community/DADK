@@ -1,0 +1,39 @@
+import { viteBundler } from '@vuepress/bundler-vite'
+import { defaultTheme } from '@vuepress/theme-default'
+import { defineUserConfig } from 'vuepress'
+
+export default defineUserConfig({
+    title: 'DADK文档',
+    description: 'DragonOS Application Development Kit',
+    bundler: viteBundler(),
+    base: process.env.NODE_ENV === 'production' ? '/p/dadk/' : '/',
+    theme: defaultTheme(
+        {
+            repo: 'DragonOS-Community/DADK',
+            repoLabel: 'GitHub',
+            editLinks: true,
+            // 默认为 "Edit this page"
+            editLinkText: '帮助我们改善此页面！',
+            smoothScroll: true,
+            docsBranch: 'main',
+            nextLinks: true,
+            logo: 'https://static.dragonos.org.cn/casdoor/dragonos_en_pic.png',
+            docsDir: 'docs',
+            navbar: [
+                {
+                    text: '首页',
+                    link: '/',
+                },
+                {
+                    text: '用户指南',
+                    link: '/user-manual/',
+                },
+                {
+                    text: '开发者指南',
+                    link: '/dev-guide/',
+                },
+            ]
+            
+        }
+    ),
+})
