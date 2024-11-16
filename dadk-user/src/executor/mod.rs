@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     env::Vars,
     path::PathBuf,
     process::{Command, Stdio},
@@ -130,6 +130,7 @@ impl Executor {
                 } else {
                     task_log.set_install_status(InstallStatus::Failed);
                 }
+                task_log.set_install_time_now();
             }
 
             Action::Clean(_) => {
@@ -175,7 +176,12 @@ impl Executor {
     fn build(&mut self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().build_status() {
             if let Some(build_time) = self.task_log().build_time() {
-                let last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
+                let mut last_modified = last_modified_time(&self.entity.file_path(), build_time)?; 
+                last_modified = core::cmp::max(
+                    last_modified,
+                    last_modified_time(&self.src_work_dir(), build_time)?,
+                );
+
                 if *status == BuildStatus::Success
                     && (self.entity.task().build_once || last_modified < *build_time)
                 {
@@ -212,21 +218,27 @@ impl Executor {
     }
 
     fn install(&self) -> Result<(), ExecutorError> {
+        log::trace!("dadk-user: install {}", self.entity.task().name_version());
         if let Some(status) = self.task_log().install_status() {
-            if let Some(build_time) = self.task_log().build_time() {
-                let last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
+            if let Some(install_time) = self.task_log().install_time() {
+                let last_modified = last_modified_time(&self.build_dir.path, install_time)?;
+                let last_modified = core::cmp::max(
+                    last_modified,
+                    last_modified_time(&self.entity.file_path(), install_time)?,
+                );
+
                 if *status == InstallStatus::Success
-                    && (self.entity.task().install_once || last_modified < *build_time)
+                    && (self.entity.task().install_once || last_modified < *install_time)
                 {
                     info!(
-                        "Task {} has been installed successfully, skip install.",
+                        "install: Task {} not changed.",
                         self.entity.task().name_version()
                     );
                     return Ok(());
                 }
             }
         }
-
+        log::trace!("dadk-user: to do install {}", self.entity.task().name_version());
         return self.do_install();
     }
 
@@ -658,44 +670,58 @@ fn last_modified_time(
     path: &PathBuf,
     build_time: &DateTime<Utc>,
 ) -> Result<DateTime<Utc>, ExecutorError> {
-    let metadata = path
-        .metadata()
-        .map_err(|e| ExecutorError::InstallError(e.to_string()))?;
+    let mut queue = VecDeque::new();
+    queue.push_back(path.clone());
 
-    let last_modified = if metadata.is_dir() {
-        let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
-        for r in std::fs::read_dir(path).unwrap() {
-            if let Ok(entry) = r {
-                // 忽略编译产物目录
-                if entry.file_name() == "target" {
-                    continue;
-                }
+    let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
 
-                let metadata = entry.metadata().unwrap();
-                if metadata.is_dir() {
-                    // 如果是子目录，则递归找改子目录下的文件最后的更新时间
-                    last_modified = std::cmp::max(
-                        last_modified,
-                        last_modified_time(&entry.path(), build_time)?,
-                    );
-                } else {
+    while let Some(current_path) = queue.pop_front() {
+        let metadata = current_path
+            .metadata()
+            .map_err(|e| ExecutorError::InstallError(e.to_string()))?;
+
+        if metadata.is_dir() {
+            for r in std::fs::read_dir(&current_path).unwrap() {
+                if let Ok(entry) = r {
+                    // 忽略编译产物目录
+                    if entry.file_name() == "target" {
+                        continue;
+                    }
+
+                    let entry_path = entry.path();
+                    let entry_metadata = entry.metadata().unwrap();
                     // 比较文件的修改时间和last_modified，取最大值
-                    last_modified = std::cmp::max(
-                        last_modified,
-                        DateTime::<Utc>::from(metadata.modified().unwrap()),
-                    );
-                }
+                    let file_modified = DateTime::<Utc>::from(entry_metadata.modified().unwrap());
+                    last_modified = std::cmp::max(last_modified, file_modified);
 
-                // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续递归
-                if last_modified > *build_time {
-                    return Ok(last_modified);
+                    // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续搜索
+                    if last_modified > *build_time {
+                        return Ok(last_modified);
+                    }
+
+                    if entry_metadata.is_dir() {
+                        // 如果是子目录，则将其加入队列
+                        queue.push_back(entry_path);
+                    }
                 }
             }
-        }
-        last_modified
-    } else {
-        DateTime::<Utc>::from(metadata.modified().unwrap())
-    };
+        } else {
+            // 如果是文件，直接比较修改时间
+            let file_modified = DateTime::<Utc>::from(metadata.modified().unwrap());
+            last_modified = std::cmp::max(last_modified, file_modified);
 
-    return Ok(last_modified);
+            // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续递归
+            if last_modified > *build_time {
+                return Ok(last_modified);
+            }
+        }
+    }
+
+    if last_modified == DateTime::<Utc>::from(SystemTime::UNIX_EPOCH) {
+        return Err(ExecutorError::InstallError(format!(
+            "Failed to get last modified time for path: {}",
+            path.display()
+        )));
+    }
+    Ok(last_modified)
 }
