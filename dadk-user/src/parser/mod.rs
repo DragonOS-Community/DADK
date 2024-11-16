@@ -221,7 +221,6 @@ impl Parser {
         // 从toml文件中解析出DADKTask
         let mut task: DADKTask = Self::parse_toml_file(config_file)?;
 
-
         // 去除字符串中的空白字符
         task.trim();
 

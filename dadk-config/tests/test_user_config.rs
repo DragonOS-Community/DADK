@@ -51,7 +51,11 @@ fn test_parse_dadk_user_config(ctx: &mut DadkConfigTestContext) {
                 version: "0.1.2".to_string(),
             },
         ],
-        build: BuildConfig::new(Some("make install".to_string()), None, None),
+        build: BuildConfig::new(
+            Some("make install".to_string()),
+            Some(PathBuf::from("config/pre_build.sh")),
+            Some(PathBuf::from("config/post_build.sh")),
+        ),
         install: InstallConfig::new(Some(PathBuf::from("/bin"))),
         clean: CleanConfig::new(Some("make clean".to_string())),
         envs: vec![

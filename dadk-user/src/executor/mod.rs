@@ -199,7 +199,7 @@ impl Executor {
     fn build(&mut self) -> Result<(), ExecutorError> {
         if let Some(status) = self.task_log().build_status() {
             if let Some(build_time) = self.task_log().build_time() {
-                let mut last_modified = last_modified_time(&self.entity.file_path(), build_time)?; 
+                let mut last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
                 last_modified = core::cmp::max(
                     last_modified,
                     last_modified_time(&self.src_work_dir(), build_time)?,
@@ -232,7 +232,7 @@ impl Executor {
             } else {
                 error!("Post-build script failed");
                 return Err(ExecutorError::TaskFailed(
-                    "Post-buildscript failed".to_string(),
+                    "Post-build script failed".to_string(),
                 ));
             }
         }
@@ -280,7 +280,10 @@ impl Executor {
                 }
             }
         }
-        log::trace!("dadk-user: to do install {}", self.entity.task().name_version());
+        log::trace!(
+            "dadk-user: to do install {}",
+            self.entity.task().name_version()
+        );
         return self.do_install();
     }
 
