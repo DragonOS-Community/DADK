@@ -2,7 +2,6 @@
   "name": "app_target_arch_riscv64_only",
   "version": "0.1.0",
   "description": "An app only target to riscv64",
-  "rust_target": null,
   "task_type": {
     "BuildFromSource": {
       "Git": {

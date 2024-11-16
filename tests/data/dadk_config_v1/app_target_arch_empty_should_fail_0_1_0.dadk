@@ -2,7 +2,6 @@
   "name": "app_target_arch_empty_should_fail",
   "version": "0.1.0",
   "description": "An app targets empty, which should failed when parsing",
-  "rust_target": null,
   "task_type": {
     "BuildFromSource": {
       "Git": {
