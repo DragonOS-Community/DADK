@@ -175,7 +175,7 @@ impl Parser {
                         continue;
                     }
                     let extension: &std::ffi::OsStr = extension.unwrap();
-                    if extension.to_ascii_lowercase() != "dadk" {
+                    if extension.to_ascii_lowercase() != "toml" {
                         continue;
                     }
                     // 找到一个配置文件, 加入列表
@@ -217,10 +217,10 @@ impl Parser {
     /// * `Ok(DADKTask)` - 生成好的任务
     /// * `Err(ParserError)` - 解析错误
     pub(super) fn parse_config_file(&self, config_file: &PathBuf) -> Result<DADKTask> {
+        log::trace!("Parsing config file {}", config_file.display());
         // 从toml文件中解析出DADKTask
         let mut task: DADKTask = Self::parse_toml_file(config_file)?;
 
-        debug!("Parsed config file {}: {:?}", config_file.display(), task);
 
         // 去除字符串中的空白字符
         task.trim();

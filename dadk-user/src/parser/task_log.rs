@@ -15,6 +15,7 @@ pub struct TaskLog {
         skip_serializing_if = "Option::is_none"
     )]
     build_timestamp: Option<DateTime<Utc>>,
+    install_timestamp: Option<DateTime<Utc>>,
     /// 任务构建状态
     build_status: Option<BuildStatus>,
     /// 任务安装状态
@@ -36,6 +37,7 @@ impl TaskLog {
         Self {
             build_timestamp: None,
             build_status: None,
+            install_timestamp: None,
             install_status: None,
         }
     }
@@ -45,14 +47,20 @@ impl TaskLog {
         self.build_timestamp = Some(time);
     }
 
-    #[allow(dead_code)]
     pub fn build_time(&self) -> Option<&DateTime<Utc>> {
         self.build_timestamp.as_ref()
     }
 
-    #[allow(dead_code)]
     pub fn set_build_time_now(&mut self) {
         self.build_timestamp = Some(Utc::now());
+    }
+
+    pub fn install_time(&self) -> Option<&DateTime<Utc>> {
+        self.install_timestamp.as_ref()
+    }
+
+    pub fn set_install_time_now(&mut self) {
+        self.install_timestamp = Some(Utc::now());
     }
 
     pub fn set_build_status(&mut self, status: BuildStatus) {
