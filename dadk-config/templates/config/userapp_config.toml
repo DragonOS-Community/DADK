@@ -7,12 +7,11 @@ version = "0.2.0"
 # 用户程序描述信息
 description = ""
 
-# （可选）是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果
-build-once = true
+# （可选）默认: false 是否只构建一次，如果为true，DADK会在构建成功后，将构建结果缓存起来，下次构建时，直接使用缓存的构建结果
+build-once = false
 
-#  (可选) 是否只安装一次，如果为true，DADK会在安装成功后，不再重复安装
-
-install-once = true
+#  (可选) 默认: false 是否只安装一次，如果为true，DADK会在安装成功后，不再重复安装
+install-once = false
 
 # 目标架构
 # 可选值："x86_64", "aarch64", "riscv64"
