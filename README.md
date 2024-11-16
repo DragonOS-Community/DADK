@@ -7,6 +7,10 @@
 
 DADK是一个用于开发DragonOS应用的工具包，设计目的是为了让开发者能够更加方便的开发DragonOS应用。
 
+## 文档
+
+DADK的文档托管在[DADK Docs](https://docs.dragonos.org.cn/p/dadk/)上。
+
 ### DADK做什么？
 
 - 自动配置libc等编译用户程序所需的环境

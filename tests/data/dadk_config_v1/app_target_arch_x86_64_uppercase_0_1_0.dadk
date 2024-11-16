@@ -2,7 +2,6 @@
   "name": "app_target_arch_x86_64_uppercase",
   "version": "0.1.0",
   "description": "An app targets x86_64(upper case and empty space)",
-  "rust_target": null,
   "task_type": {
     "BuildFromSource": {
       "Git": {
