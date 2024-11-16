@@ -2,7 +2,6 @@
   "name": "app_normal",
   "version": "0.1.0",
   "description": "A normal app",
-  "rust_target": null,
   "task_type": {
     "BuildFromSource": {
       "Local": {

@@ -108,7 +108,6 @@ pub mod context;
 pub mod executor;
 pub mod parser;
 mod scheduler;
-pub mod static_resources;
 mod utils;
 
 pub fn dadk_user_main(context: DadkUserExecuteContext) {

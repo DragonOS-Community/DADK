@@ -2,7 +2,6 @@
   "name": "app_all_target_arch_0_1_0",
   "version": "0.1.0",
   "description": "An app targets to all arch",
-  "rust_target": null,
   "task_type": {
     "BuildFromSource": {
       "Git": {

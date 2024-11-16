@@ -2,7 +2,6 @@
   "name": "app_target_arch_x86_64_only",
   "version": "0.1.0",
   "description": "An app only target to x86_64",
-  "rust_target": null,
   "task_type": {
     "BuildFromSource": {
       "Git": {
