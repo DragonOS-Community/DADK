@@ -31,8 +31,8 @@ fn test_parse_dadk_user_config(ctx: &mut DadkConfigTestContext) {
         name: "userapp_config".to_string(),
         version: "0.2.0".to_string(),
         description: "".to_string(),
-        build_once: true,
-        install_once: true,
+        build_once: false,
+        install_once: false,
         task_source: TaskSource {
             source_type: TaskSourceType::BuildFromSource,
             source: Source::Git,
