@@ -1,5 +1,5 @@
 use core::str;
-use std::{path::PathBuf, process::Command};
+use std::{path::PathBuf, process::Command, thread::sleep, time::Duration};
 
 use anyhow::{anyhow, Result};
 use regex::Regex;
@@ -39,6 +39,7 @@ impl LoopDevice {
         if output.status.success() {
             let loop_device = String::from_utf8(output.stdout)?.trim().to_string();
             self.loop_device_path = Some(loop_device);
+            sleep(Duration::from_millis(100));
             log::trace!(
                 "Loop device attached: {}",
                 self.loop_device_path.as_ref().unwrap()
