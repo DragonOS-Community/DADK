@@ -11,6 +11,8 @@ const LOOP_DEVICE_LOSETUP_A_REGEX: &str = r"^/dev/loop(\d+)";
 pub struct LoopDevice {
     img_path: Option<PathBuf>,
     loop_device_path: Option<String>,
+    /// 尝试在drop时自动detach
+    try_detach_when_drop: bool,
 }
 impl LoopDevice {
     pub fn attached(&self) -> bool {
@@ -111,6 +113,12 @@ impl LoopDevice {
             return Ok(());
         }
         let loop_device = self.loop_device_path.take().unwrap();
+        let p = PathBuf::from(&loop_device);
+        log::trace!(
+            "Detach loop device: {}, exists: {}",
+            p.display(),
+            p.exists()
+        );
         let output = Command::new("losetup")
             .arg("-d")
             .arg(loop_device)
@@ -127,12 +135,23 @@ impl LoopDevice {
             ))
         }
     }
+
+    pub fn try_detach_when_drop(&self) -> bool {
+        self.try_detach_when_drop
+    }
+
+    #[allow(dead_code)]
+    pub fn set_try_detach_when_drop(&mut self, try_detach_when_drop: bool) {
+        self.try_detach_when_drop = try_detach_when_drop;
+    }
 }
 
 impl Drop for LoopDevice {
     fn drop(&mut self) {
-        if let Err(e) = self.detach() {
-            log::warn!("Failed to detach loop device: {}", e);
+        if self.try_detach_when_drop() {
+            if let Err(e) = self.detach() {
+                log::warn!("Failed to detach loop device: {}", e);
+            }
         }
     }
 }
@@ -140,6 +159,7 @@ impl Drop for LoopDevice {
 pub struct LoopDeviceBuilder {
     img_path: Option<PathBuf>,
     loop_device_path: Option<String>,
+    try_detach_when_drop: bool,
 }
 
 impl LoopDeviceBuilder {
@@ -147,6 +167,7 @@ impl LoopDeviceBuilder {
         LoopDeviceBuilder {
             img_path: None,
             loop_device_path: None,
+            try_detach_when_drop: true,
         }
     }
 
@@ -155,10 +176,17 @@ impl LoopDeviceBuilder {
         self
     }
 
+    #[allow(dead_code)]
+    pub fn try_detach_when_drop(mut self, try_detach_when_drop: bool) -> Self {
+        self.try_detach_when_drop = try_detach_when_drop;
+        self
+    }
+
     pub fn build(self) -> Result<LoopDevice> {
         let loop_dev = LoopDevice {
             img_path: self.img_path,
             loop_device_path: self.loop_device_path,
+            try_detach_when_drop: self.try_detach_when_drop,
         };
 
         Ok(loop_dev)

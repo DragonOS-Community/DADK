@@ -168,11 +168,8 @@ pub fn umount(ctx: &DADKExecContext) -> Result<()> {
 
     if let Ok(mut loop_device) = loop_device {
         let loop_dev_path = loop_device.dev_path().cloned();
-        if let Err(e) = loop_device.detach().map_err(|e| anyhow!("{}", e)) {
-            if ctx.rootfs().partition.image_should_be_partitioned() {
-                return Err(e);
-            }
-        }
+        loop_device.detach().ok();
+
         log::info!("Loop device detached: {:?}", loop_dev_path);
     }
 
@@ -244,6 +241,33 @@ fn create_raw_img(disk_image_path: &PathBuf, image_size: usize) -> Result<()> {
         remaining_size -= write_size;
     }
 
+    Ok(())
+}
+
+pub fn check_disk_image_exists(ctx: &DADKExecContext) -> Result<()> {
+    let disk_image_path = ctx.disk_image_path();
+    if disk_image_path.exists() {
+        println!("1");
+    } else {
+        println!("0");
+    }
+    Ok(())
+}
+
+pub fn show_mount_point(ctx: &DADKExecContext) -> Result<()> {
+    let disk_mount_path = ctx.disk_mount_path();
+    println!("{}", disk_mount_path.display());
+    Ok(())
+}
+
+pub fn show_loop_device(ctx: &DADKExecContext) -> Result<()> {
+    let disk_image_path = ctx.disk_image_path();
+    let mut loop_device = LoopDeviceBuilder::new().img_path(disk_image_path).build()?;
+    if let Err(e) = loop_device.attach_by_exists() {
+        log::error!("Failed to attach loop device: {}", e);
+    } else {
+        println!("{}", loop_device.dev_path().unwrap());
+    }
     Ok(())
 }
 
