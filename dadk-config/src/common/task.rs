@@ -46,12 +46,26 @@ pub struct BuildConfig {
     /// 构建命令
     #[serde(rename = "build-command")]
     pub build_command: Option<String>,
+    /// 构建前执行的脚本
+    #[serde(rename = "pre-build")]
+    pub pre_build: Option<PathBuf>,
+    #[serde(rename = "post-build")]
+    /// 构建后执行的脚本
+    pub post_build: Option<PathBuf>,
 }
 
 impl BuildConfig {
     #[allow(dead_code)]
-    pub fn new(build_command: Option<String>) -> Self {
-        Self { build_command }
+    pub fn new(
+        build_command: Option<String>,
+        pre_build: Option<PathBuf>,
+        post_build: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            build_command,
+            pre_build,
+            post_build,
+        }
     }
 
     pub fn validate(&self) -> Result<()> {

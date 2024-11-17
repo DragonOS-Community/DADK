@@ -150,8 +150,12 @@ impl Executor {
 
         match self.action {
             Action::Build => {
+                // 构建前的工作
+                self.pre_build()?;
                 // 构建任务
                 self.build()?;
+                // 构建完毕后的工作
+                self.post_build()?;
             }
             Action::Install => {
                 // 把构建结果安装到DragonOS
@@ -171,6 +175,25 @@ impl Executor {
         }
 
         return Ok(());
+    }
+
+    fn pre_build(&mut self) -> Result<(), ExecutorError> {
+        if let Some(pre_build) = self.entity.task().build.pre_build {
+            let output = Command::new(pre_build)
+                .output()
+                .expect("Failed to execute pre_build script");
+
+            // 检查脚本执行结果
+            if output.status.success() {
+                info!("Pre-build script executed successfully");
+            } else {
+                error!("Pre-build script failed");
+                return Err(ExecutorError::TaskFailed(
+                    "Pre-build script failed".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn build(&mut self) -> Result<(), ExecutorError> {
@@ -195,6 +218,25 @@ impl Executor {
         }
 
         return self.do_build();
+    }
+
+    fn post_build(&mut self) -> Result<(), ExecutorError> {
+        if let Some(post_build) = self.entity.task().build.post_build {
+            let output = Command::new(post_build)
+                .output()
+                .expect("Failed to execute post_build script");
+
+            // 检查脚本执行结果
+            if output.status.success() {
+                info!("Post-build script executed successfully");
+            } else {
+                error!("Post-build script failed");
+                return Err(ExecutorError::TaskFailed(
+                    "Post-build script failed".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// # 执行build操作

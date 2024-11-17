@@ -43,6 +43,12 @@ revision = "01cdc56863"
 # （可选）构建命令
 build-command = "make install"
 
+# （可选）预构建脚本路径
+pre-build = "config/pre_build.sh"
+
+# （可选）构建后脚本路径
+post-build = "config/post_build.sh"
+
 # 安装相关信息
 [install]
 
