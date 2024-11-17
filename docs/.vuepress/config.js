@@ -32,7 +32,28 @@ export default defineUserConfig({
                     text: '开发者指南',
                     link: '/dev-guide/',
                 },
-            ]
+            ],
+            sidebar: {
+                '/': 'heading',
+                '/dev-guide/': [
+                    {
+                        text: '开发者指南',
+                        children: [
+                            '/dev-guide/README.md',
+                            '/dev-guide/how-to-write-docs.md',
+                        ],
+                    },
+                ],
+                '/user-manual/': [
+                    {
+                        text: '用户指南',
+                        children: [
+                            '/user-manual/README.md',
+                            
+                        ]
+                    }
+                ]
+            }
             
         }
     ),
