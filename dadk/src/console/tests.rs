@@ -1,3 +1,4 @@
+use rootfs::CreateCommandParam;
 use user::UserCleanLevel;
 
 use super::*;
@@ -25,7 +26,29 @@ fn test_command_line_args_with_manifest() {
 #[test]
 fn test_command_line_args_rootfs_subcommand() {
     let args = CommandLineArgs::parse_from(&["dadk", "rootfs", "create"]);
-    assert!(matches!(args.action, Action::Rootfs(RootFSCommand::Create)));
+    assert!(matches!(
+        args.action,
+        Action::Rootfs(RootFSCommand::Create(CreateCommandParam {
+            skip_if_exists: false
+        }))
+    ));
+
+    let args = CommandLineArgs::parse_from(&["dadk", "rootfs", "create", "--skip-if-exists"]);
+    assert!(matches!(
+        args.action,
+        Action::Rootfs(RootFSCommand::Create(CreateCommandParam {
+            skip_if_exists: true
+        }))
+    ));
+}
+
+#[test]
+fn test_show_mountpoint() {
+    let args = CommandLineArgs::parse_from(&["dadk", "rootfs", "show-mountpoint"]);
+    assert!(matches!(
+        args.action,
+        Action::Rootfs(RootFSCommand::ShowMountPoint)
+    ));
 }
 
 #[test]
