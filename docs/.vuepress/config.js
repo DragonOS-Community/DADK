@@ -48,7 +48,7 @@ export default defineUserConfig({
                     {
                         text: '用户指南',
                         children: [
-                            '/user-manual/README.md',
+                            '/user-manual/quickstart.md',
                             
                         ]
                     }
