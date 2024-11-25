@@ -50,6 +50,8 @@ export default defineUserConfig({
                         children: [
                             '/user-manual/quickstart.md',
                             '/user-manual/profiling.md',
+                            '/user-manual/user-prog-build.md',
+                            '/user-manual/envs.md',
                             
                         ]
                     }
