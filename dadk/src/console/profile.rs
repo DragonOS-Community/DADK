@@ -39,7 +39,7 @@ pub struct ProfileSampleArgs {
 
     #[clap(
         long = "format",
-        help = "Output file forma (flamegraph, json, fold)",
+        help = "Output file format (flamegraph, json, folded)",
         default_value = "flamegraph",
         value_parser = parse_profile_file_type
     )]
@@ -104,7 +104,35 @@ fn parse_cpu_mask(s: &str) -> Result<u128> {
 }
 
 #[derive(Debug, Parser, Clone, PartialEq, Eq)]
-pub struct ProfileParseArgs {}
+pub struct ProfileParseArgs {
+    #[clap(
+        long = "duration",
+        help = "Duration of the sampling in seconds",
+        default_value = "10s",
+        value_parser = parse_time_interval
+    )]
+    duration: Duration,
+    #[clap(long = "input", help = "Path of the input file")]
+    pub input: PathBuf,
+
+    #[clap(long = "output", help = "Path of the output file")]
+    pub output: PathBuf,
+
+    #[clap(
+        long = "format",
+        help = "Output file format (flamegraph, json, folded)",
+        default_value = "flamegraph",
+        value_parser = parse_profile_file_type
+    )]
+    pub format: ProfileFileType,
+
+    #[clap(
+        long = "cpu-mask",
+        help = "CPU mask to filter",
+        value_parser = parse_cpu_mask
+    )]
+    pub cpu_mask: Option<u128>,
+}
 
 /// 输出的文件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

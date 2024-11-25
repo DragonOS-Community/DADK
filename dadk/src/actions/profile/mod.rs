@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    io::Write,
+    io::{Read, Write},
     path::PathBuf,
     process::Command,
     sync::{
@@ -33,18 +33,22 @@ pub(super) fn run(ctx: &DADKExecContext, cmd: &ProfileCommand) -> Result<()> {
     }
 }
 
-fn sample(ctx: &DADKExecContext, args: &ProfileSampleArgs) -> Result<()> {
+fn sample(_ctx: &DADKExecContext, args: &ProfileSampleArgs) -> Result<()> {
     let profiler = Profiler::new(args.clone());
     profiler.run()?;
     profiler.save()
 }
 
-fn parse_input_data(ctx: &DADKExecContext, args: &ProfileParseArgs) -> Result<()> {
-    unimplemented!("profile parse command not implemented")
+fn parse_input_data(_ctx: &DADKExecContext, args: &ProfileParseArgs) -> Result<()> {
+    let sample_buf =
+        SampleBuffer::from_saved_file(&args.input).expect("Failed to load sample buffer");
+    sample_buf.export_data(args.format, &args.output, args.cpu_mask);
+    log::info!("Profile data saved to {}", args.output.display());
+    Ok(())
 }
 
 /// 一个时刻的采样数据
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Sample {
     /// The sample data
     /// The key is the cpu id
@@ -116,6 +120,7 @@ impl Sample {
         }
     }
 
+    #[allow(dead_code)]
     fn vcpu_count(&self) -> usize {
         self.data.len()
     }
@@ -137,7 +142,7 @@ impl SampleBuffer {
         self.samples.push(sample);
     }
 
-    fn export_data(&self, t: ProfileFileType, outpath: PathBuf, cpumask: Option<u128>) {
+    fn export_data(&self, t: ProfileFileType, outpath: &PathBuf, cpumask: Option<u128>) {
         let mut writer = std::fs::File::create(outpath).unwrap();
         match t {
             ProfileFileType::Json => {
@@ -146,10 +151,7 @@ impl SampleBuffer {
             }
             ProfileFileType::Folded => {
                 let folded = self.fold(cpumask);
-
-                for (k, cnt) in folded.data {
-                    writeln!(writer, "{} {}", k, cnt).unwrap();
-                }
+                writer.write(folded.to_string().as_bytes()).unwrap();
             }
             ProfileFileType::Flamegraph => {
                 let folded = self.fold(cpumask);
@@ -200,6 +202,20 @@ impl SampleBuffer {
         }
 
         folded_buffer
+    }
+
+    fn from_saved_file(path: &PathBuf) -> Result<Self> {
+        let mut file = std::fs::File::open(path)?;
+        let mut buf = String::new();
+        file.read_to_string(&mut buf)?;
+        let samples = serde_json::from_str::<SampleBuffer>(&buf).ok();
+        if let Some(samples) = samples {
+            return Ok(samples);
+        }
+
+        // check if it is a folded file
+        let folded = FoldedSampleBuffer::try_from(&buf)?;
+        Ok(folded.into())
     }
 }
 
@@ -291,7 +307,7 @@ impl Profiler {
     fn save(&self) -> Result<()> {
         self.samples.lock().unwrap().export_data(
             self.args.format,
-            self.args.output.clone(),
+            &self.args.output,
             self.args.cpu_mask,
         );
         Ok(())
@@ -343,6 +359,56 @@ struct FoldedSampleBuffer {
     /// key: Stack trace (separated by `;`)
     /// value: The number of occurrences of such stack frames
     data: HashMap<String, usize>,
+}
+impl FoldedSampleBuffer {
+    pub fn try_from<T: AsRef<str>>(s: T) -> Result<Self> {
+        let s = s.as_ref();
+        let mut data = HashMap::new();
+
+        for line in s.lines() {
+            let parts: Vec<&str> = line.split(' ').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Invalid format"));
+            }
+
+            let key = parts[0].trim().to_string();
+            let value = parts[1]
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| anyhow!("Invalid number"))?;
+
+            data.insert(key, value);
+        }
+
+        Ok(FoldedSampleBuffer { data })
+    }
+}
+
+impl ToString for FoldedSampleBuffer {
+    fn to_string(&self) -> String {
+        let lines: Vec<String> = self
+            .data
+            .iter()
+            .map(|(k, v)| format!("{} {}", k, v))
+            .collect();
+        lines.join("\n")
+    }
+}
+
+impl Into<SampleBuffer> for FoldedSampleBuffer {
+    fn into(self) -> SampleBuffer {
+        let mut samples = SampleBuffer::new();
+        for (stack, count) in self.data {
+            let mut sample = Sample::new(0, 0);
+            for frame in stack.split(';').rev() {
+                sample.push_new_line(frame);
+            }
+            for _ in 0..count {
+                samples.push(sample.clone());
+            }
+        }
+        samples
+    }
 }
 
 /// Removes content within angle brackets from the input string.
