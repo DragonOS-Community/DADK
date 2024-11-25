@@ -19,6 +19,6 @@ pub(super) fn parse_manifest(builder: &mut DADKExecContextBuilder) -> Result<()>
         return Err(anyhow!("Manifest path does not exist or is not a file"));
     }
     let dadk_manifest_file = DadkManifestFile::load(&manifest_path)?;
-    builder.manifest = Some(dadk_manifest_file);
+    builder.manifest = Some(Some(dadk_manifest_file));
     Ok(())
 }

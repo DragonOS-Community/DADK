@@ -49,6 +49,7 @@ export default defineUserConfig({
                         text: '用户指南',
                         children: [
                             '/user-manual/quickstart.md',
+                            '/user-manual/profiling.md',
                             
                         ]
                     }

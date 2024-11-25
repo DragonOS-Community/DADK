@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
+use profile::ProfileCommand;
 use rootfs::RootFSCommand;
 use user::UserCommand;
 
+pub mod profile;
 pub mod rootfs;
 #[cfg(test)]
 mod tests;
@@ -38,4 +40,17 @@ pub enum Action {
     /// 用户程序构建相关操作
     #[command(subcommand, name = "user")]
     User(UserCommand),
+
+    #[command(subcommand, name = "profile")]
+    Profile(ProfileCommand),
+}
+
+impl Action {
+    /// 是否需要在dadk启动时读取 manifest 文件
+    pub fn needs_manifest(&self) -> bool {
+        if matches!(self, Action::Profile(_)) {
+            return false;
+        }
+        return true;
+    }
 }

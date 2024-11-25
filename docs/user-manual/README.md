@@ -6,3 +6,4 @@
 ## 目录
 
 - [Quick Start - 快速开始！](./quickstart.md)
+- [对DragonOS内核进行性能分析](./profiling.md)
