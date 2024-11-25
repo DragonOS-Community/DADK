@@ -7,3 +7,5 @@
 
 - [Quick Start - 快速开始！](./quickstart.md)
 - [对DragonOS内核进行性能分析](./profiling.md)
+- [构建用户程序](./user-prog-build.md)
+- [环境变量](./envs.md)
