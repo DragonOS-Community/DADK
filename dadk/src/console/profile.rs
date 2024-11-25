@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_parse_time_interval() {
         assert_eq!(
-            parse_time_interval("1sm").unwrap(),
+            parse_time_interval("1ms").unwrap(),
             Duration::from_millis(1)
         );
         assert_eq!(parse_time_interval("1s").unwrap(), Duration::from_secs(1));
