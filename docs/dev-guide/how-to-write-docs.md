@@ -31,4 +31,4 @@ npm run docs:dev
 
 ### 添加一个新的文档
 
-您创建md之后，需要在`docs/.vitepress/config.js`中添加路由。
+您创建md之后，需要在`docs/.vuepress/config.js`中添加路由。
