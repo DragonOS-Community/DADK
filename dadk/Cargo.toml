@@ -17,14 +17,12 @@ readme = "README.md"
 [[bin]]
 name = "dadk"
 path = "src/main.rs"
-doc = true
 
 # 这个target与上面的内容一样，
 # 只是为了方便在开发，测试时使用（不会跟正式版本的dadk冲突）
 [[bin]]
 name = "dadk-insiders"
 path = "src/main.rs"
-doc = true
 required-features = ["insiders"]
 
 
