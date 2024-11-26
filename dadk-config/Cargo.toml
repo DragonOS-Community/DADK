@@ -7,6 +7,8 @@ authors = [
     "chikejian <chikejian@DragonOS.org>",
     "xuzihao <xuzihao@DragonOS.org>"
 ]
+description = "DragonOS Application Development Kit - Config"
+license = "GPL-2.0-only"
 
 [dependencies]
 anyhow = { version = "1.0.90", features = ["std", "backtrace"] }

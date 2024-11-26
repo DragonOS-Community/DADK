@@ -2,6 +2,8 @@
 name = "dadk-user"
 version = "0.2.0"
 edition = "2021"
+description = "DragonOS Application Development Kit - user prog build"
+license = "GPL-2.0-only"
 
 [dependencies]
 anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
