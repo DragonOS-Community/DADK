@@ -35,8 +35,8 @@ insiders = []
 anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
 clap = { version = "4.5.20", features = ["derive"] }
 crossbeam = "0.8.4"
-dadk-config = { path = "../dadk-config" }
-dadk-user = { path = "../dadk-user" }
+dadk-config = { version = "0.2.0", path = "../dadk-config" }
+dadk-user = { version = "0.2.0", path = "../dadk-user" }
 derive_builder = "0.20.0"
 env_logger = "0.11.5"
 humantime = "2.1.0"
