@@ -52,7 +52,6 @@ export default defineUserConfig({
                             '/user-manual/profiling.md',
                             '/user-manual/user-prog-build.md',
                             '/user-manual/envs.md',
-                            
                         ]
                     }
                 ]
