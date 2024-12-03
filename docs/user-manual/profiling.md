@@ -16,7 +16,7 @@
 
 简单的说，火焰图是基于性能采样结果产生的 SVG 图片，用来展示 CPU 的调用栈。
 
-![](https://web-static2.dragonos.org.cn//longjin/202411252121491.png?imageSlim)
+![](https://static.dragonos.org.cn/dadk/202411252121491.png)
 
 x 轴表示抽样数，如果一个函数在 x 轴占据的宽度越宽，就表示它被抽到的次数多，即执行的时间长。注意，x 轴不代表时间，而是所有的调用栈合并后，按字母顺序排列的。
 
@@ -91,5 +91,5 @@ dadk profile sample --format flamegraph  --output flame.svg --interval 200ms --d
 
 **你可以右键下面的图片，在新的标签页打开，体验交互效果。**
 
-![](https://web-static2.dragonos.org.cn//longjin/flame2.svg?imageSlim)
+![](https://static.dragonos.org.cn/dadk/6327214712.svg)
 
