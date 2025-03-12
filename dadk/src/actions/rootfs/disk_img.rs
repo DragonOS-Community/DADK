@@ -94,7 +94,7 @@ fn mount_partitioned_image(
 
     loop_device
         .attach()
-        .map_err(|e| anyhow!("Failed to attach loop device: {}", e))?;
+        .map_err(|e| anyhow!("mount: Failed to attach loop device: {}", e))?;
 
     let dev_path = loop_device.partition_path(1)?;
     mount_unpartitioned_image(ctx, &dev_path, disk_mount_path)?;
@@ -202,7 +202,7 @@ fn create_partitioned_image(ctx: &DADKExecContext, disk_image_path: &PathBuf) ->
         .map_err(|e| anyhow!("Failed to create loop device: {}", e))?;
     loop_device
         .attach()
-        .map_err(|e| anyhow!("Failed to attach loop device: {}", e))?;
+        .map_err(|e| anyhow!("creat: Failed to attach loop device: {}", e))?;
 
     let partition_path = loop_device.partition_path(1)?;
     let fs_type = ctx.rootfs().metadata.fs_type;
