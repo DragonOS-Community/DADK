@@ -100,12 +100,23 @@ impl LoopDevice {
             return Err(anyhow!("Loop device not attached"));
         }
         let s = format!("{}p{}", self.loop_device_path.as_ref().unwrap(), nth);
-        let s = PathBuf::from(s);
+        let direct_path = PathBuf::from(s);
         // 判断路径是否存在
-        if !s.exists() {
+        if !direct_path.exists() {
+            Command::new("kpartx")
+                .arg("-a")
+                .arg(self.loop_device_path.as_ref().unwrap())
+                .output()?;
+            let device_name = direct_path.file_name().unwrap();
+            let parent_path = direct_path.parent().unwrap();
+            let new_path = parent_path.join("mapper").join(device_name);
+            if new_path.exists() {
+                return Ok(new_path);
+            }
+            log::error!("Both {} and {} not exist!", direct_path.display(), new_path.display());
             return Err(anyhow!("Partition not exist"));
         }
-        Ok(s)
+        Ok(direct_path)
     }
 
     pub fn detach(&mut self) -> Result<()> {
@@ -119,6 +130,10 @@ impl LoopDevice {
             p.display(),
             p.exists()
         );
+        let kpart_detach = Command::new("kpartx")
+            .arg("-dv")
+            .arg(&loop_device)
+            .output()?;
         let output = Command::new("losetup")
             .arg("-d")
             .arg(loop_device)
