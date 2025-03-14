@@ -130,7 +130,7 @@ impl LoopDevice {
             p.display(),
             p.exists()
         );
-        let kpart_detach = Command::new("kpartx")
+        let _kpart_detach = Command::new("kpartx")
             .arg("-dv")
             .arg(&loop_device)
             .output()?;
@@ -253,11 +253,11 @@ mod tests {
 
     #[test]
     fn test_parse_losetup_a_output() {
-        let losetup_a_output = r#"/dev/loop1: []: (/data/bin/disk-image-x86_64.img)
+        let losetup_a_output = r#"/dev/loop1: []: (/data/bin/x86_64/disk.img)
 /dev/loop29: []: (/var/lib/abc.img)
 /dev/loop13: []: (/var/lib/snapd/snaps/gtk-common-themes_1535.snap
 /dev/loop19: []: (/var/lib/snapd/snaps/gnome-42-2204_172.snap)"#;
-        let disk_img_path = "/data/bin/disk-image-x86_64.img";
+        let disk_img_path = "/data/bin/x86_64/disk.img";
         let loop_device_path =
             __loop_device_path_by_disk_image_path(disk_img_path, losetup_a_output).unwrap();
         assert_eq!(loop_device_path, "/dev/loop1");
@@ -265,11 +265,11 @@ mod tests {
 
     #[test]
     fn test_parse_lsblk_output_not_match() {
-        let losetup_a_output = r#"/dev/loop1: []: (/data/bin/disk-image-x86_64.img)
+        let losetup_a_output = r#"/dev/loop1: []: (/data/bin/x86_64/disk.img)
 /dev/loop29: []: (/var/lib/abc.img)
 /dev/loop13: []: (/var/lib/snapd/snaps/gtk-common-themes_1535.snap
 /dev/loop19: []: (/var/lib/snapd/snaps/gnome-42-2204_172.snap)"#;
-        let disk_img_path = "/data/bin/disk-image-riscv64.img";
+        let disk_img_path = "/data/bin/riscv64/disk.img";
         let loop_device_path =
             __loop_device_path_by_disk_image_path(disk_img_path, losetup_a_output);
         assert!(

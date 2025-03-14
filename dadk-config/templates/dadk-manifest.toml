@@ -15,10 +15,10 @@ rootfs-config = "config/rootfs.toml"
 boot-config = "config/boot.toml"
 
 # System root directory folder (DADK will copy the files in this directory to the root directory of the disk image)
-sysroot-dir = "bin/sysroot"
+sysroot-dir = "bin/x86_64/sysroot"
 
 # DADK Root Cache directory path
-cache-root-dir = "bin/dadk_cache"
+cache-root-dir = "bin/x86_64/dadk_cache"
 
 # User configuration directory path
 # 这个字段只是临时用于兼容旧版本，v0.2版本重构完成后会删除
