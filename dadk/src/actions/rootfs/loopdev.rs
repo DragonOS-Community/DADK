@@ -102,7 +102,7 @@ impl LoopDevice {
         let s = format!("{}p{}", self.loop_device_path.as_ref().unwrap(), nth);
         let direct_path = PathBuf::from(s);
         // 判断路径是否存在
-        if !direct_path.exists() {
+        if !direct_path.exists() || !direct_path.is_file() {
             Command::new("kpartx")
                 .arg("-a")
                 .arg(self.loop_device_path.as_ref().unwrap())
