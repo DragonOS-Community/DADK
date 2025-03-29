@@ -36,16 +36,16 @@ crossbeam = "0.8.4"
 dadk-config = { version = "0.2.0", path = "../dadk-config" }
 dadk-user = { version = "0.2.0", path = "../dadk-user" }
 derive_builder = "0.20.0"
-env_logger = "0.11.5"
+env_logger = { workspace = true }
 humantime = "2.1.0"
 indicatif = "0.17.9"
 inferno = "0.12.0"
 lazy_static = "1.4.0"
-log = "0.4.22"
+log = { workspace = true }
 rayon = "1.10.0"
 regex = "1.9.1"
-serde = { version = "1.0.160", features = ["serde_derive"] }
-serde_json = "1.0.96"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.13.0"
