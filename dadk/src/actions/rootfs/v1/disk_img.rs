@@ -261,7 +261,10 @@ pub fn show_mount_point(ctx: &DADKExecContext) -> Result<()> {
 
 pub fn show_loop_device(ctx: &DADKExecContext) -> Result<()> {
     let disk_image_path = ctx.disk_image_path();
-    let mut loop_device = LoopDeviceBuilder::new().detach_on_drop(false).img_path(disk_image_path).build()?;
+    let mut loop_device = LoopDeviceBuilder::new()
+        .detach_on_drop(false)
+        .img_path(disk_image_path)
+        .build()?;
     if let Err(e) = loop_device.attach_by_exists() {
         log::error!("Failed to attach loop device: {}", e);
     } else {

@@ -115,7 +115,11 @@ impl LoopDevice {
             if new_path.exists() {
                 return Ok(new_path);
             }
-            log::error!("Both {} and {} not exist!", direct_path.display(), new_path.display());
+            log::error!(
+                "Both {} and {} not exist!",
+                direct_path.display(),
+                new_path.display()
+            );
             return Err(anyhow!("Unable to find partition path {}", nth));
         }
         Ok(direct_path)
@@ -139,13 +143,14 @@ impl LoopDevice {
             self.mapper = false;
         }
 
-        let output = Command::new("losetup")
-            .arg("-d")
-            .arg(&loop_device)
-            .output();
+        let output = Command::new("losetup").arg("-d").arg(&loop_device).output();
 
         if !output.is_ok() {
-            log::error!("losetup failed to detach loop device [{}]: {}", &loop_device, output.unwrap_err());
+            log::error!(
+                "losetup failed to detach loop device [{}]: {}",
+                &loop_device,
+                output.unwrap_err()
+            );
             return;
         }
 
@@ -159,7 +164,6 @@ impl LoopDevice {
                 str::from_utf8(output.stderr.as_slice()).unwrap_or("<Unknown>")
             );
         }
-
     }
 
     #[allow(dead_code)]
@@ -182,9 +186,9 @@ impl Drop for LoopDevice {
 }
 
 mod mapper {
-    use std::process::Command;
-    use anyhow::Result;
     use anyhow::anyhow;
+    use anyhow::Result;
+    use std::process::Command;
 
     pub(super) fn create_mapper(dev_path: &str) -> Result<()> {
         let output = Command::new("kpartx")
@@ -218,7 +222,11 @@ mod mapper {
                 );
             }
         } else {
-            log::error!("Failed to detach mapper device [{}]: {}", dev_path, output.unwrap_err());
+            log::error!(
+                "Failed to detach mapper device [{}]: {}",
+                dev_path,
+                output.unwrap_err()
+            );
         }
     }
 }
@@ -254,7 +262,7 @@ impl LoopDeviceBuilder {
             img_path: self.img_path,
             loop_device_path: self.loop_device_path,
             detach_on_drop: self.detach_on_drop,
-            mapper: false
+            mapper: false,
         };
 
         Ok(loop_dev)
