@@ -88,6 +88,7 @@ fn mount_partitioned_image(
     let mut loop_device = ManuallyDrop::new(
         LoopDeviceBuilder::new()
             .img_path(disk_image_path.clone())
+            .detach_on_drop(false)
             .build()
             .map_err(|e| anyhow!("Failed to create loop device: {}", e))?,
     );
@@ -166,11 +167,10 @@ pub fn umount(ctx: &DADKExecContext) -> Result<()> {
         }
     }
 
-    if let Ok(mut loop_device) = loop_device {
+    if let Ok(loop_device) = loop_device {
         let loop_dev_path = loop_device.dev_path().cloned();
-        loop_device.detach().ok();
 
-        log::info!("Loop device detached: {:?}", loop_dev_path);
+        log::info!("Loop device going to detached: {:?}", loop_dev_path);
     }
 
     Ok(())
@@ -207,7 +207,6 @@ fn create_partitioned_image(ctx: &DADKExecContext, disk_image_path: &PathBuf) ->
     let partition_path = loop_device.partition_path(1)?;
     let fs_type = ctx.rootfs().metadata.fs_type;
     DiskFormatter::format_disk(&partition_path, &fs_type)?;
-    loop_device.detach()?;
     Ok(())
 }
 
@@ -262,7 +261,7 @@ pub fn show_mount_point(ctx: &DADKExecContext) -> Result<()> {
 
 pub fn show_loop_device(ctx: &DADKExecContext) -> Result<()> {
     let disk_image_path = ctx.disk_image_path();
-    let mut loop_device = LoopDeviceBuilder::new().img_path(disk_image_path).build()?;
+    let mut loop_device = LoopDeviceBuilder::new().detach_on_drop(false).img_path(disk_image_path).build()?;
     if let Err(e) = loop_device.attach_by_exists() {
         log::error!("Failed to attach loop device: {}", e);
     } else {

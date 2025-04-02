@@ -12,8 +12,11 @@ pub struct LoopDevice {
     img_path: Option<PathBuf>,
     loop_device_path: Option<String>,
     /// 尝试在drop时自动detach
-    try_detach_when_drop: bool,
+    detach_on_drop: bool,
+    /// mapper created
+    mapper: bool,
 }
+
 impl LoopDevice {
     pub fn attached(&self) -> bool {
         self.loop_device_path.is_some()
@@ -95,18 +98,17 @@ impl LoopDevice {
     /// # 错误
     ///
     /// 如果循环设备未附加，则返回 `anyhow!("Loop device not attached")` 错误。
-    pub fn partition_path(&self, nth: u8) -> Result<PathBuf> {
+    pub fn partition_path(&mut self, nth: u8) -> Result<PathBuf> {
         if !self.attached() {
             return Err(anyhow!("Loop device not attached"));
         }
-        let s = format!("{}p{}", self.loop_device_path.as_ref().unwrap(), nth);
-        let direct_path = PathBuf::from(s);
+        let dev_path = self.loop_device_path.as_ref().unwrap();
+        let direct_path = PathBuf::from(format!("{}p{}", dev_path, nth));
+
         // 判断路径是否存在
-        if !direct_path.exists() || !direct_path.is_file() {
-            Command::new("kpartx")
-                .arg("-a")
-                .arg(self.loop_device_path.as_ref().unwrap())
-                .output()?;
+        if !direct_path.exists() {
+            mapper::create_mapper(self.loop_device_path.as_ref().unwrap())?;
+            self.mapper = true;
             let device_name = direct_path.file_name().unwrap();
             let parent_path = direct_path.parent().unwrap();
             let new_path = parent_path.join("mapper").join(device_name);
@@ -114,14 +116,14 @@ impl LoopDevice {
                 return Ok(new_path);
             }
             log::error!("Both {} and {} not exist!", direct_path.display(), new_path.display());
-            return Err(anyhow!("Partition not exist"));
+            return Err(anyhow!("Unable to find partition path {}", nth));
         }
         Ok(direct_path)
     }
 
-    pub fn detach(&mut self) -> Result<()> {
+    pub fn detach(&mut self) {
         if self.loop_device_path.is_none() {
-            return Ok(());
+            return;
         }
         let loop_device = self.loop_device_path.take().unwrap();
         let p = PathBuf::from(&loop_device);
@@ -130,43 +132,93 @@ impl LoopDevice {
             p.display(),
             p.exists()
         );
-        let _kpart_detach = Command::new("kpartx")
-            .arg("-dv")
-            .arg(&loop_device)
-            .output()?;
+
+        if self.mapper {
+            mapper::detach_mapper(&loop_device);
+            log::trace!("Detach mapper device: {}", &loop_device);
+            self.mapper = false;
+        }
+
         let output = Command::new("losetup")
             .arg("-d")
-            .arg(loop_device)
-            .output()?;
+            .arg(&loop_device)
+            .output();
 
-        if output.status.success() {
-            self.loop_device_path = None;
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Failed to detach loop device: {}, {}",
+        if !output.is_ok() {
+            log::error!("losetup failed to detach loop device [{}]: {}", &loop_device, output.unwrap_err());
+            return;
+        }
+
+        let output = output.unwrap();
+
+        if !output.status.success() {
+            log::error!(
+                "losetup failed to detach loop device [{}]: {}, {}",
+                loop_device,
                 output.status,
                 str::from_utf8(output.stderr.as_slice()).unwrap_or("<Unknown>")
-            ))
+            );
         }
+
     }
 
-    pub fn try_detach_when_drop(&self) -> bool {
-        self.try_detach_when_drop
+    #[allow(dead_code)]
+    pub fn detach_on_drop(&self) -> bool {
+        self.detach_on_drop
     }
 
     #[allow(dead_code)]
     pub fn set_try_detach_when_drop(&mut self, try_detach_when_drop: bool) {
-        self.try_detach_when_drop = try_detach_when_drop;
+        self.detach_on_drop = try_detach_when_drop;
     }
 }
 
 impl Drop for LoopDevice {
     fn drop(&mut self) {
-        if self.try_detach_when_drop() {
-            if let Err(e) = self.detach() {
-                log::warn!("Failed to detach loop device: {}", e);
+        if self.detach_on_drop {
+            self.detach();
+        }
+    }
+}
+
+mod mapper {
+    use std::process::Command;
+    use anyhow::Result;
+    use anyhow::anyhow;
+
+    pub(super) fn create_mapper(dev_path: &str) -> Result<()> {
+        let output = Command::new("kpartx")
+            .arg("-a")
+            .arg("-v")
+            .arg(dev_path)
+            .output()
+            .map_err(|e| anyhow!("Failed to run kpartx: {}", e))?;
+        if output.status.success() {
+            let output_str = String::from_utf8(output.stdout)?;
+            log::trace!("kpartx output: {}", output_str);
+            return Ok(());
+        }
+        Err(anyhow!("Failed to create mapper"))
+    }
+
+    pub(super) fn detach_mapper(dev_path: &str) {
+        let output = Command::new("kpartx")
+            .arg("-d")
+            .arg("-v")
+            .arg(dev_path)
+            .output();
+        if output.is_ok() {
+            let output = output.unwrap();
+            if !output.status.success() {
+                log::error!(
+                    "kpartx failed to detach mapper device [{}]: {}, {}",
+                    dev_path,
+                    output.status,
+                    String::from_utf8(output.stderr).unwrap_or("<Unknown>".to_string())
+                );
             }
+        } else {
+            log::error!("Failed to detach mapper device [{}]: {}", dev_path, output.unwrap_err());
         }
     }
 }
@@ -174,7 +226,7 @@ impl Drop for LoopDevice {
 pub struct LoopDeviceBuilder {
     img_path: Option<PathBuf>,
     loop_device_path: Option<String>,
-    try_detach_when_drop: bool,
+    detach_on_drop: bool,
 }
 
 impl LoopDeviceBuilder {
@@ -182,7 +234,7 @@ impl LoopDeviceBuilder {
         LoopDeviceBuilder {
             img_path: None,
             loop_device_path: None,
-            try_detach_when_drop: true,
+            detach_on_drop: true,
         }
     }
 
@@ -192,8 +244,8 @@ impl LoopDeviceBuilder {
     }
 
     #[allow(dead_code)]
-    pub fn try_detach_when_drop(mut self, try_detach_when_drop: bool) -> Self {
-        self.try_detach_when_drop = try_detach_when_drop;
+    pub fn detach_on_drop(mut self, detach_on_drop: bool) -> Self {
+        self.detach_on_drop = detach_on_drop;
         self
     }
 
@@ -201,7 +253,8 @@ impl LoopDeviceBuilder {
         let loop_dev = LoopDevice {
             img_path: self.img_path,
             loop_device_path: self.loop_device_path,
-            try_detach_when_drop: self.try_detach_when_drop,
+            detach_on_drop: self.detach_on_drop,
+            mapper: false
         };
 
         Ok(loop_dev)
