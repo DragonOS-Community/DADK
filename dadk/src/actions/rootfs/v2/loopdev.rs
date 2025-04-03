@@ -1,239 +1,51 @@
 use core::str;
 use std::{path::PathBuf, process::Command, thread::sleep, time::Duration};
 
-use anyhow::{anyhow, Result};
 use regex::Regex;
 
 use crate::utils::abs_path;
 
 const LOOP_DEVICE_LOSETUP_A_REGEX: &str = r"^/dev/loop(\d+)";
 
-pub struct LoopDevice {
-    img_path: Option<PathBuf>,
-    loop_device_path: Option<String>,
-    /// 尝试在drop时自动detach
-    detach_on_drop: bool,
-    /// mapper created
-    mapper: bool,
-}
-
-impl LoopDevice {
-    pub fn attached(&self) -> bool {
-        self.loop_device_path.is_some()
-    }
-
-    pub fn dev_path(&self) -> Option<&String> {
-        self.loop_device_path.as_ref()
-    }
-
-    pub fn attach(&mut self) -> Result<()> {
-        if self.attached() {
-            return Ok(());
-        }
-        if self.img_path.is_none() {
-            return Err(anyhow!("Image path not set"));
-        }
-
-        let output = Command::new("losetup")
-            .arg("-f")
-            .arg("--show")
-            .arg("-P")
-            .arg(self.img_path.as_ref().unwrap())
-            .output()?;
-
-        if output.status.success() {
-            let loop_device = String::from_utf8(output.stdout)?.trim().to_string();
-            self.loop_device_path = Some(loop_device);
-            sleep(Duration::from_millis(100));
-            log::trace!(
-                "Loop device attached: {}",
-                self.loop_device_path.as_ref().unwrap()
-            );
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Failed to mount disk image: losetup command exited with status {}",
-                output.status
-            ))
-        }
-    }
-
-    /// 尝试连接已经存在的loop device
-    pub fn attach_by_exists(&mut self) -> Result<()> {
-        if self.attached() {
-            return Ok(());
-        }
-        if self.img_path.is_none() {
-            return Err(anyhow!("Image path not set"));
-        }
-        log::trace!(
-            "Try to attach loop device by exists: image path: {}",
-            self.img_path.as_ref().unwrap().display()
-        );
-        // losetup -a 查看是否有已经attach了的，如果有，就附着上去
-        let cmd = Command::new("losetup")
-            .arg("-a")
-            .output()
-            .map_err(|e| anyhow!("Failed to run losetup -a: {}", e))?;
-        let output = String::from_utf8(cmd.stdout)?;
-        let s = __loop_device_path_by_disk_image_path(
-            self.img_path.as_ref().unwrap().to_str().unwrap(),
-            &output,
-        )
-        .map_err(|e| anyhow!("Failed to find loop device: {}", e))?;
-        self.loop_device_path = Some(s);
-        Ok(())
-    }
-
-    /// 获取指定分区的路径
-    ///
-    /// # 参数
-    ///
-    /// * `nth` - 分区的编号
-    ///
-    /// # 返回值
-    ///
-    /// 返回一个 `Result<String>`，包含分区路径的字符串。如果循环设备未附加，则返回错误。
-    ///
-    /// # 错误
-    ///
-    /// 如果循环设备未附加，则返回 `anyhow!("Loop device not attached")` 错误。
-    pub fn partition_path(&mut self, nth: u8) -> Result<PathBuf> {
-        if !self.attached() {
-            return Err(anyhow!("Loop device not attached"));
-        }
-        let dev_path = self.loop_device_path.as_ref().unwrap();
-        let direct_path = PathBuf::from(format!("{}p{}", dev_path, nth));
-
-        // 判断路径是否存在
-        if !direct_path.exists() {
-            mapper::create_mapper(self.loop_device_path.as_ref().unwrap())?;
-            self.mapper = true;
-            let device_name = direct_path.file_name().unwrap();
-            let parent_path = direct_path.parent().unwrap();
-            let new_path = parent_path.join("mapper").join(device_name);
-            if new_path.exists() {
-                return Ok(new_path);
-            }
-            log::error!(
-                "Both {} and {} not exist!",
-                direct_path.display(),
-                new_path.display()
-            );
-            return Err(anyhow!("Unable to find partition path {}", nth));
-        }
-        Ok(direct_path)
-    }
-
-    pub fn detach(&mut self) {
-        if self.loop_device_path.is_none() {
-            return;
-        }
-        let loop_device = self.loop_device_path.take().unwrap();
-        let p = PathBuf::from(&loop_device);
-        log::trace!(
-            "Detach loop device: {}, exists: {}",
-            p.display(),
-            p.exists()
-        );
-
-        if self.mapper {
-            mapper::detach_mapper(&loop_device);
-            log::trace!("Detach mapper device: {}", &loop_device);
-            self.mapper = false;
-        }
-
-        let output = Command::new("losetup").arg("-d").arg(&loop_device).output();
-
-        if !output.is_ok() {
-            log::error!(
-                "losetup failed to detach loop device [{}]: {}",
-                &loop_device,
-                output.unwrap_err()
-            );
-            return;
-        }
-
-        let output = output.unwrap();
-
-        if !output.status.success() {
-            log::error!(
-                "losetup failed to detach loop device [{}]: {}, {}",
-                loop_device,
-                output.status,
-                str::from_utf8(output.stderr.as_slice()).unwrap_or("<Unknown>")
-            );
-        }
-    }
-
+#[derive(Debug)]
+pub enum LoopError {
+    InvalidUtf8,
+    ImageNotFound,
+    LoopDeviceNotFound,
+    NoMapperAvailable,
+    NoPartitionAvailable,
+    Losetup(String),
+    Kpartx(String),
     #[allow(dead_code)]
-    pub fn detach_on_drop(&self) -> bool {
-        self.detach_on_drop
-    }
+    Other(anyhow::Error),
+}
 
-    #[allow(dead_code)]
-    pub fn set_try_detach_when_drop(&mut self, try_detach_when_drop: bool) {
-        self.detach_on_drop = try_detach_when_drop;
+impl From<std::string::FromUtf8Error> for LoopError {
+    fn from(_: std::string::FromUtf8Error) -> Self {
+        LoopError::InvalidUtf8
     }
 }
 
-impl Drop for LoopDevice {
-    fn drop(&mut self) {
-        if self.detach_on_drop {
-            self.detach();
+impl std::fmt::Display for LoopError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoopError::InvalidUtf8 => write!(f, "Invalid UTF-8"),
+            LoopError::ImageNotFound => write!(f, "Image not found"),
+            LoopError::LoopDeviceNotFound => write!(f, "Loop device not found"),
+            LoopError::NoMapperAvailable => write!(f, "No mapper available"),
+            LoopError::NoPartitionAvailable => write!(f, "No partition available"),
+            LoopError::Losetup(err) => write!(f, "Losetup error: {}", err),
+            LoopError::Kpartx(err) => write!(f, "Kpartx error: {}", err),
+            LoopError::Other(err) => write!(f, "Other error: {}", err),
         }
     }
 }
 
-mod mapper {
-    use anyhow::anyhow;
-    use anyhow::Result;
-    use std::process::Command;
-
-    pub(super) fn create_mapper(dev_path: &str) -> Result<()> {
-        let output = Command::new("kpartx")
-            .arg("-a")
-            .arg("-v")
-            .arg(dev_path)
-            .output()
-            .map_err(|e| anyhow!("Failed to run kpartx: {}", e))?;
-        if output.status.success() {
-            let output_str = String::from_utf8(output.stdout)?;
-            log::trace!("kpartx output: {}", output_str);
-            return Ok(());
-        }
-        Err(anyhow!("Failed to create mapper"))
-    }
-
-    pub(super) fn detach_mapper(dev_path: &str) {
-        let output = Command::new("kpartx")
-            .arg("-d")
-            .arg("-v")
-            .arg(dev_path)
-            .output();
-        if output.is_ok() {
-            let output = output.unwrap();
-            if !output.status.success() {
-                log::error!(
-                    "kpartx failed to detach mapper device [{}]: {}, {}",
-                    dev_path,
-                    output.status,
-                    String::from_utf8(output.stderr).unwrap_or("<Unknown>".to_string())
-                );
-            }
-        } else {
-            log::error!(
-                "Failed to detach mapper device [{}]: {}",
-                dev_path,
-                output.unwrap_err()
-            );
-        }
-    }
-}
+impl std::error::Error for LoopError {}
 
 pub struct LoopDeviceBuilder {
     img_path: Option<PathBuf>,
-    loop_device_path: Option<String>,
+    // loop_device_path: Option<String>,
     detach_on_drop: bool,
 }
 
@@ -241,7 +53,7 @@ impl LoopDeviceBuilder {
     pub fn new() -> Self {
         LoopDeviceBuilder {
             img_path: None,
-            loop_device_path: None,
+            // loop_device_path: None,
             detach_on_drop: true,
         }
     }
@@ -257,23 +69,45 @@ impl LoopDeviceBuilder {
         self
     }
 
-    pub fn build(self) -> Result<LoopDevice> {
-        let loop_dev = LoopDevice {
-            img_path: self.img_path,
-            loop_device_path: self.loop_device_path,
-            detach_on_drop: self.detach_on_drop,
-            mapper: false,
-        };
+    pub fn build(self) -> Result<LoopDevice, LoopError> {
+        if self.img_path.is_none() {
+            return Err(LoopError::ImageNotFound);
+        }
 
-        Ok(loop_dev)
+        let img_path = self.img_path.unwrap();
+
+        log::trace!(
+            "Try to attach loop device by exists: image path: {}",
+            img_path.display()
+        );
+
+        let loop_device = LoopDevice::new(img_path, self.detach_on_drop)?;
+        return Ok(loop_device);
     }
+}
+
+fn attach_loop_by_image(img_path: &str) -> Result<String, LoopError> {
+    LosetupCmd::new()
+        .arg("-f")
+        .arg("--show")
+        .arg("-P")
+        .arg(img_path)
+        .output()
+        .map(|output_path| output_path.trim().to_string())
+}
+
+fn attach_exists_loop_by_image(img_path: &str) -> Result<String, LoopError> {
+    // losetup -a 查看是否有已经attach了的，如果有，就附着上去
+    let output = LosetupCmd::new().arg("-a").output()?;
+
+    __loop_device_path_by_disk_image_path(img_path, &output)
 }
 
 fn __loop_device_path_by_disk_image_path(
     disk_img_path: &str,
     losetup_a_output: &str,
-) -> Result<String> {
-    let re = Regex::new(LOOP_DEVICE_LOSETUP_A_REGEX)?;
+) -> Result<String, LoopError> {
+    let re = Regex::new(LOOP_DEVICE_LOSETUP_A_REGEX).unwrap();
     for line in losetup_a_output.lines() {
         if !line.contains(disk_img_path) {
             continue;
@@ -283,11 +117,294 @@ fn __loop_device_path_by_disk_image_path(
             continue;
         }
         let caps = caps.unwrap();
-        let loop_device = caps.get(1).unwrap().as_str();
+        let loop_device = caps.get(1).unwrap().as_str().trim();
         let loop_device = format!("/dev/loop{}", loop_device);
         return Ok(loop_device);
     }
-    Err(anyhow!("Loop device not found"))
+    Err(LoopError::LoopDeviceNotFound)
+}
+
+pub struct LoopDevice {
+    path: PathBuf,
+    detach_on_drop: bool,
+    mapper: Mapper,
+}
+
+impl LoopDevice {
+    fn new(img_path: PathBuf, detach_on_drop: bool) -> Result<Self, LoopError> {
+        if !img_path.exists() {
+            return Err(LoopError::ImageNotFound);
+        }
+        let str_img_path = img_path.to_str().ok_or(LoopError::InvalidUtf8)?;
+
+        let may_attach = attach_exists_loop_by_image(str_img_path);
+
+        let loop_device_path = match may_attach {
+            Ok(loop_device_path) => {
+                log::trace!("Loop device already attached: {}", loop_device_path);
+                loop_device_path
+            }
+            Err(LoopError::LoopDeviceNotFound) => {
+                log::trace!("No loop device found, try to attach");
+                attach_loop_by_image(str_img_path)?
+            }
+            Err(err) => {
+                log::error!("Failed to attach loop device: {}", err);
+                return Err(err);
+            }
+        };
+
+        let path = PathBuf::from(loop_device_path);
+        sleep(Duration::from_millis(100));
+        if !path.exists() {
+            return Err(LoopError::LoopDeviceNotFound);
+        }
+
+        let mapper = Mapper::new(path.clone(), detach_on_drop)?;
+
+        Ok(Self {
+            path,
+            detach_on_drop,
+            mapper,
+        })
+    }
+
+    pub fn dev_path(&self) -> String {
+        self.path.to_string_lossy().to_string()
+    }
+
+    pub fn partition_path(&self, nth: u8) -> Result<PathBuf, LoopError> {
+        self.mapper.partition_path(nth)
+    }
+
+    // #[allow(dead_code)]
+    // pub fn detach_on_drop(&self) -> bool {
+    //     self.detach_on_drop
+    // }
+
+    // #[allow(dead_code)]
+    // pub fn set_detach_on_drop(&mut self, detach_on_drop: bool) {
+    //     self.detach_on_drop = detach_on_drop;
+    // }
+}
+
+impl Drop for LoopDevice {
+    fn drop(&mut self) {
+        if !self.detach_on_drop {
+            return;
+        }
+        log::trace!(
+            "Detach loop device: {}, exists: {}",
+            &self.path.display(),
+            self.path.exists()
+        );
+        if self.path.exists() {
+            let path = self.path.to_string_lossy();
+            if let Err(err) = LosetupCmd::new().arg("-d").arg(&path).output() {
+                log::error!("Failed to detach loop device: {}", err);
+            }
+        }
+    }
+}
+
+struct LosetupCmd {
+    inner: Command,
+}
+
+impl LosetupCmd {
+    fn new() -> Self {
+        LosetupCmd {
+            inner: Command::new("losetup"),
+        }
+    }
+
+    fn arg(&mut self, arg: &str) -> &mut Self {
+        self.inner.arg(arg);
+        self
+    }
+
+    fn output(&mut self) -> Result<String, LoopError> {
+        let output = self
+            .inner
+            .output()
+            .map_err(|e| LoopError::Losetup(e.to_string()))?;
+        if output.status.success() {
+            let stdout = String::from_utf8(output.stdout)?;
+            Ok(stdout)
+        } else {
+            Err(LoopError::Losetup(format!(
+                "losetup failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )))
+        }
+    }
+}
+
+struct Mapper {
+    dev_path: PathBuf,
+    detach_on_drop: bool,
+    use_kpartx: bool,
+    partitions: Vec<String>,
+}
+
+impl Mapper {
+    fn new(path: PathBuf, detach_on_drop: bool) -> Result<Self, LoopError> {
+        // check if raw part mapper is available, if {device_dir}/loopXpX
+        let mut parts = Vec::new();
+        let partition_name_prefix = format!("{}p", path.file_name().unwrap().to_str().unwrap());
+        let device_dir = path.parent().unwrap();
+
+        for entry in device_dir.read_dir().unwrap() {
+            if let Ok(entry) = entry {
+                let entry = entry.file_name().into_string().unwrap();
+                if entry.starts_with(&partition_name_prefix) {
+                    parts.push(entry);
+                }
+            }
+        }
+
+        if !parts.is_empty() {
+            log::trace!("Found raw part mapper: {:?}", parts);
+            return Ok(Self {
+                dev_path: path.to_path_buf(),
+                detach_on_drop,
+                partitions: parts,
+                use_kpartx: false,
+            });
+        }
+
+        // check if mapper is created, found if {device_dir}/mapper/loopX
+        let mapper_path = device_dir.join("mapper");
+
+        for entry in mapper_path.read_dir().unwrap() {
+            if let Ok(entry) = entry {
+                let entry = entry.file_name().into_string().unwrap();
+                if entry.starts_with(&partition_name_prefix) {
+                    parts.push(entry);
+                }
+            }
+        }
+
+        if !parts.is_empty() {
+            log::trace!("Found kpartx mapper exist: {:?}", parts);
+            return Ok(Self {
+                dev_path: path,
+                detach_on_drop,
+                partitions: parts,
+                use_kpartx: true,
+            });
+        }
+
+        KpartxCmd::new()
+            .arg("-a")
+            .arg(path.to_str().unwrap())
+            .output()?;
+        for entry in mapper_path.read_dir().unwrap() {
+            if let Ok(entry) = entry {
+                let entry = entry.file_name().into_string().unwrap();
+                if entry.starts_with(&partition_name_prefix) {
+                    parts.push(entry);
+                }
+            }
+        }
+
+        if !parts.is_empty() {
+            log::trace!("New kpartx with parts: {:?}", parts);
+            return Ok(Self {
+                dev_path: path,
+                detach_on_drop,
+                partitions: parts,
+                use_kpartx: true,
+            });
+        }
+
+        Err(LoopError::NoMapperAvailable)
+    }
+
+    fn partition_path(&self, nth: u8) -> Result<PathBuf, LoopError> {
+        if self.partitions.is_empty() {
+            // unlikely, already checked in new()
+            log::warn!("No partition available, but the mapper device exists!");
+            return Err(LoopError::NoPartitionAvailable);
+        }
+        let map_root = if !self.use_kpartx {
+            self.dev_path
+                .parent()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            // kpartx mapper device
+            self.dev_path
+                .with_file_name("mapper")
+                .to_string_lossy()
+                .into_owned()
+        };
+        let partition = PathBuf::from(format!(
+            "{}/{}",
+            map_root,
+            self.partitions
+                .get((nth - 1) as usize)
+                .ok_or(LoopError::NoPartitionAvailable)?,
+        ));
+        if !partition.exists() {
+            log::warn!("Partition exists, but the specified partition does not exist!");
+            log::warn!("Available partitions: {:?}", self.partitions);
+            log::warn!("Try to find partition: {}", partition.display());
+            return Err(LoopError::NoPartitionAvailable);
+        }
+        Ok(partition)
+    }
+}
+
+impl Drop for Mapper {
+    fn drop(&mut self) {
+        if !self.detach_on_drop {
+            return;
+        }
+        if self.dev_path.exists() {
+            let path = self.dev_path.to_string_lossy();
+            if self.use_kpartx {
+                if let Err(err) = KpartxCmd::new().arg("-d").arg(&path).output() {
+                    log::error!("Failed to detach mapper device: {}", err);
+                }
+            }
+        }
+    }
+}
+
+struct KpartxCmd {
+    inner: Command,
+}
+
+impl KpartxCmd {
+    fn new() -> Self {
+        KpartxCmd {
+            inner: Command::new("kpartx"),
+        }
+    }
+
+    fn arg(&mut self, arg: &str) -> &mut Self {
+        self.inner.arg(arg);
+        self
+    }
+
+    fn output(&mut self) -> Result<String, LoopError> {
+        let output = self
+            .inner
+            .output()
+            .map_err(|e| LoopError::Kpartx(e.to_string()))?;
+        if output.status.success() {
+            let stdout = String::from_utf8(output.stdout)?;
+            Ok(stdout)
+        } else {
+            Err(LoopError::Kpartx(format!(
+                "kpartx failed execute: {:?}, Result: {}",
+                self.inner.get_args(),
+                String::from_utf8_lossy(&output.stderr)
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
