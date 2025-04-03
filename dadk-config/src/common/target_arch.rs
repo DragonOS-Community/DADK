@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// 目标处理器架构
@@ -69,6 +71,16 @@ impl Serialize for TargetArch {
     {
         let string: String = Into::into(*self);
         serializer.serialize_str(string.as_str())
+    }
+}
+
+impl Display for TargetArch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TargetArch::X86_64 => write!(f, "x86_64"),
+            TargetArch::RiscV64 => write!(f, "riscv64"),
+            TargetArch::AArch64 => write!(f, "aarch64"),
+        }
     }
 }
 
