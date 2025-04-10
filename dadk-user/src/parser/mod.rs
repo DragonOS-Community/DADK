@@ -147,7 +147,7 @@ impl Parser {
         if r.is_err() {
             error!("Error while parsing config files: {:?}", r);
         }
-        return r;
+        r
     }
 
     /// # 扫描配置文件目录，找到所有配置文件
@@ -158,9 +158,9 @@ impl Parser {
         // 将config目录加入队列
         dir_queue.push(self.config_dir.clone());
 
-        while !dir_queue.is_empty() {
+        while let Some(dir) = dir_queue.pop() {
             // 扫描目录，找到所有*.dadk文件
-            let dir = dir_queue.pop().unwrap();
+            
             let entries: ReadDir = std::fs::read_dir(&dir)?;
 
             for entry in entries {
@@ -184,7 +184,7 @@ impl Parser {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     /// # 解析所有配置文件，生成任务列表
@@ -203,7 +203,7 @@ impl Parser {
             result_vec.push((config_file.clone(), task));
         }
 
-        return Ok(result_vec);
+        Ok(result_vec)
     }
 
     /// # 解析单个配置文件，生成任务
@@ -227,7 +227,7 @@ impl Parser {
         // 校验DADKTask的参数是否合法
         task.validate()?;
 
-        return Ok(task);
+        Ok(task)
     }
 
     /// 解析toml文件，生成DADKTask

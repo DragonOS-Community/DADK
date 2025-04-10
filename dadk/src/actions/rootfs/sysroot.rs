@@ -15,7 +15,7 @@ pub(super) fn delete(ctx: &DADKExecContext) -> Result<()> {
     }
 
     // 检查 sysroot_dir 是否是当前工作目录的子目录
-    if !sysroot_dir.starts_with(&ctx.workdir()) {
+    if !sysroot_dir.starts_with(ctx.workdir()) {
         return Err(anyhow!(
             "Sysroot directory must be a subdirectory of the current working directory"
         ));

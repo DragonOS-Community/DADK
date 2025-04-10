@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn test_deserialize_fat32_lowercase() {
         let r = deserialize_fs_type("fat32");
-        assert_eq!(r.is_ok(), true);
+        assert!(r.is_ok());
         let fs_type = r.unwrap();
         assert_eq!(fs_type, FsType::Fat32);
     }
@@ -41,7 +41,7 @@ mod tests {
     #[test]
     fn test_deserialize_fat32_mixed_case() {
         let r = deserialize_fs_type("FAT32");
-        assert_eq!(r.is_ok(), true);
+        assert!(r.is_ok());
         let fs_type = r.unwrap();
         assert_eq!(fs_type, FsType::Fat32);
     }

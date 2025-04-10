@@ -14,8 +14,8 @@ impl StdioUtils {
         let start = if lines.len() > n { lines.len() - n } else { 0 };
         for line in lines.iter().skip(start) {
             result.push_str(line);
-            result.push_str("\n");
+            result.push('\n');
         }
-        return result;
+        result
     }
 }

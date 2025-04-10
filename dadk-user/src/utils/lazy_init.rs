@@ -33,6 +33,12 @@ pub struct Lazy<T> {
     initialized: AtomicBool,
 }
 
+impl<T> Default for Lazy<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Lazy<T> {
     /// Creates a new `Lazy` value that will be initialized with the
     /// result of the closure `init`.
@@ -51,7 +57,7 @@ impl<T> Lazy<T> {
         if initialized {
             return true;
         }
-        return false;
+        false
     }
 
     /// Ensures that this lazy value is initialized. If the value has not
@@ -93,7 +99,7 @@ impl<T> Lazy<T> {
         if self.initialized() {
             return Some(unsafe { self.get_unchecked() });
         }
-        return None;
+        None
     }
 
     /// Forces the evaluation of this lazy value and returns a mutable
@@ -107,12 +113,12 @@ impl<T> Lazy<T> {
 
     #[inline(always)]
     pub unsafe fn get_unchecked(&self) -> &T {
-        return &*(*self.value.get()).as_ptr();
+        &*(*self.value.get()).as_ptr()
     }
 
     #[inline(always)]
     pub unsafe fn get_mut_unchecked(&mut self) -> &mut T {
-        return &mut *(*self.value.get()).as_mut_ptr();
+        &mut *(*self.value.get()).as_mut_ptr()
     }
 }
 
@@ -135,9 +141,9 @@ impl<T> DerefMut for Lazy<T> {
 impl<T: Debug> Debug for Lazy<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if let Some(value) = self.try_get() {
-            return write!(f, "Lazy({:?})", value);
+            write!(f, "Lazy({:?})", value)
         } else {
-            return write!(f, "Lazy(uninitialized)");
+            write!(f, "Lazy(uninitialized)")
         }
     }
 }

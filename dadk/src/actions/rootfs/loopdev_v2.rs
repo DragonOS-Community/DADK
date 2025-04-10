@@ -129,7 +129,7 @@ impl LoopDeviceBuilder {
         );
 
         let loop_device = LoopDevice::new(img_path, self.detach_on_drop)?;
-        return Ok(loop_device);
+        Ok(loop_device)
     }
 }
 

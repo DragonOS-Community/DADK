@@ -71,7 +71,7 @@ impl Sample {
     }
 
     fn push_new_line(&mut self, line: &str) {
-        if line.starts_with("#") {
+        if line.starts_with('#') {
             self.parse_frame_line(line);
         } else {
             self.parse_thread_line(line);
@@ -81,7 +81,7 @@ impl Sample {
     fn parse_frame_line(&mut self, line: &str) {
         let line = line.trim();
         // todo: 支持调整删除的`<>`的层级，以便打印更详细的信息
-        let line = remove_angle_bracket_content(&line);
+        let line = remove_angle_bracket_content(line);
         let line = remove_guest_address(&line);
         let mut line = remove_rust_impl_pattern(&line);
         line = line.replace("(...)", "");
@@ -109,8 +109,8 @@ impl Sample {
                     .unwrap(),
             );
 
-            if !self.data.contains_key(&self.current_cpu.unwrap()) {
-                self.data.insert(self.current_cpu.unwrap(), Vec::new());
+            if let std::collections::btree_map::Entry::Vacant(e) = self.data.entry(self.current_cpu.unwrap()) {
+                e.insert(Vec::new());
             } else {
                 log::error!(
                     "current cpu {} is already set in hashmap",
@@ -395,10 +395,10 @@ impl ToString for FoldedSampleBuffer {
     }
 }
 
-impl Into<SampleBuffer> for FoldedSampleBuffer {
-    fn into(self) -> SampleBuffer {
+impl From<FoldedSampleBuffer> for SampleBuffer {
+    fn from(val: FoldedSampleBuffer) -> Self {
         let mut samples = SampleBuffer::new();
-        for (stack, count) in self.data {
+        for (stack, count) in val.data {
             let mut sample = Sample::new(0, 0);
             for frame in stack.split(';').rev() {
                 sample.push_new_line(frame);

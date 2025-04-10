@@ -32,6 +32,12 @@ where
     Ok(r.unwrap_or_default())
 }
 
+impl Default for TaskLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskLog {
     pub fn new() -> Self {
         Self {

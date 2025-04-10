@@ -42,9 +42,9 @@ impl TestContext for DadkConfigTestContext {
         // 设置workdir
         std::env::set_current_dir(&test_base_path).expect("Failed to setup test base path");
 
-        let r = DadkConfigTestContext { test_base_path };
+        
 
-        r
+        DadkConfigTestContext { test_base_path }
     }
 }
 

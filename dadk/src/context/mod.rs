@@ -49,7 +49,7 @@ impl DADKExecContext {
 
     /// 设置进程的工作目录
     fn setup_workdir(&self) -> Result<()> {
-        std::env::set_current_dir(&self.workdir()).expect("Failed to set current directory");
+        std::env::set_current_dir(self.workdir()).expect("Failed to set current directory");
         Ok(())
     }
     /// Get rootfs configuration
@@ -68,8 +68,7 @@ impl DADKExecContext {
     ///
     /// If the directory does not exist, or the path is not a folder, an error is returned
     pub fn sysroot_dir(&self) -> Result<PathBuf> {
-        check_dir_exists(&self.manifest().metadata.sysroot_dir)
-            .map(|p| p.clone())
+        check_dir_exists(&self.manifest().metadata.sysroot_dir).cloned()
             .map_err(|e| anyhow::anyhow!("Failed to get sysroot dir: {}", e))
     }
 
@@ -77,15 +76,13 @@ impl DADKExecContext {
     ///
     /// If the directory does not exist, or the path is not a folder, an error is returned
     pub fn cache_root_dir(&self) -> Result<PathBuf> {
-        check_dir_exists(&self.manifest().metadata.cache_root_dir)
-            .map(|p| p.clone())
+        check_dir_exists(&self.manifest().metadata.cache_root_dir).cloned()
             .map_err(|e| anyhow::anyhow!("Failed to get cache root dir: {}", e))
     }
 
     #[deprecated]
     pub fn user_config_dir(&self) -> Result<PathBuf> {
-        check_dir_exists(&self.manifest().metadata.user_config_dir)
-            .map(|p| p.clone())
+        check_dir_exists(&self.manifest().metadata.user_config_dir).cloned()
             .map_err(|e| anyhow::anyhow!("Failed to get user config dir: {}", e))
     }
 

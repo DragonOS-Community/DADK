@@ -69,7 +69,7 @@ impl BuildConfig {
     }
 
     pub fn validate(&self) -> Result<()> {
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {
@@ -101,7 +101,7 @@ impl InstallConfig {
                 "InstallConfig: in_dragonos_path should be an Absolute path",
             ));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {}
@@ -121,7 +121,7 @@ impl CleanConfig {
     }
 
     pub fn validate(&self) -> Result<()> {
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {
@@ -153,7 +153,7 @@ impl Dependency {
         if self.version.is_empty() {
             return Err(Error::msg("version is empty"));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {
@@ -162,7 +162,7 @@ impl Dependency {
     }
 
     pub fn name_version(&self) -> String {
-        return format!("{}-{}", self.name, self.version);
+        format!("{}-{}", self.name, self.version)
     }
 }
 
@@ -200,7 +200,7 @@ impl TaskEnv {
         if self.key.is_empty() {
             return Err(Error::msg("Env: key is empty"));
         }
-        return Ok(());
+        Ok(())
     }
 }
 

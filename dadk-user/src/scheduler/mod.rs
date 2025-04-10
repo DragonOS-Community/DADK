@@ -109,7 +109,7 @@ impl SchedEntity {
                 zero_child.push(child.clone());
             }
         }
-        return zero_child;
+        zero_child
     }
 }
 
@@ -120,6 +120,12 @@ impl SchedEntity {
 pub struct SchedEntities {
     /// 任务ID到调度实体的映射
     id2entity: RwLock<BTreeMap<i32, Arc<SchedEntity>>>,
+}
+
+impl Default for SchedEntities {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SchedEntities {
@@ -147,7 +153,7 @@ impl SchedEntities {
                 return Some(e.1.clone());
             }
         }
-        return None;
+        None
     }
 
     pub fn entities(&self) -> Vec<Arc<SchedEntity>> {
@@ -155,7 +161,7 @@ impl SchedEntities {
         for e in self.id2entity.read().unwrap().iter() {
             v.push(e.1.clone());
         }
-        return v;
+        v
     }
 
     pub fn id2entity(&self) -> BTreeMap<i32, Arc<SchedEntity>> {
@@ -192,7 +198,7 @@ impl SchedEntities {
                 }
             }
         }
-        return result;
+        result
     }
 
     fn dfs(
@@ -244,7 +250,7 @@ impl SchedEntities {
         }
         visited.insert(entity.id(), true);
         result.push(entity.clone());
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -316,7 +322,7 @@ impl Scheduler {
             return Err(r.err().unwrap());
         }
 
-        return Ok(scheduler);
+        Ok(scheduler)
     }
 
     /// # 添加多个任务
@@ -333,7 +339,7 @@ impl Scheduler {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     /// # 任务是否匹配当前目标架构
@@ -387,12 +393,12 @@ impl Scheduler {
         self.target.add(entity.clone());
 
         info!("Task added: {}", entity.task().name_version());
-        return Ok(entity);
+        Ok(entity)
     }
 
     fn generate_task_id(&self) -> i32 {
         static TASK_ID: AtomicI32 = AtomicI32::new(0);
-        return TASK_ID.fetch_add(1, Ordering::SeqCst);
+        TASK_ID.fetch_add(1, Ordering::SeqCst)
     }
 
     /// # 执行调度器中的所有任务
@@ -408,7 +414,7 @@ impl Scheduler {
             Action::Clean(_) => self.run_without_topo_sort()?,
         }
 
-        return Ok(());
+        Ok(())
     }
 
     /// Action需要按照拓扑序执行
@@ -425,7 +431,7 @@ impl Scheduler {
         // 对调度实体进行拓扑排序
         let r: Vec<Arc<SchedEntity>> = self.target.topo_sort();
 
-        let action = self.action.clone();
+        let action = self.action;
         let dragonos_dir = self.sysroot_dir.clone();
         let id2entity = self.target.id2entity();
         let count = r.len();
@@ -437,13 +443,13 @@ impl Scheduler {
 
         handler.join().expect("Could not join deamon");
 
-        return Ok(());
+        Ok(())
     }
 
     /// Action不需要按照拓扑序执行
     fn run_without_topo_sort(&self) -> Result<(), SchedulerError> {
         // 启动守护线程
-        let action = self.action.clone();
+        let action = self.action;
         let dragonos_dir = self.sysroot_dir.clone();
         let mut r = self.target.entities();
         let handler = std::thread::spawn(move || {
@@ -451,11 +457,11 @@ impl Scheduler {
         });
 
         handler.join().expect("Could not join deamon");
-        return Ok(());
+        Ok(())
     }
 
     pub fn execute(action: Action, dragonos_dir: PathBuf, entity: Arc<SchedEntity>) {
-        let mut executor = Executor::new(entity.clone(), action.clone(), dragonos_dir.clone())
+        let mut executor = Executor::new(entity.clone(), action, dragonos_dir.clone())
             .map_err(|e| {
                 error!(
                     "Error while creating executor for task {} : {:?}",
@@ -512,7 +518,7 @@ impl Scheduler {
             // 将入度为0的任务实体加入任务队列中，直至没有入度为0的任务实体 或 任务队列满了
             while !zero_entity.is_empty()
                 && guard.build_install_task(
-                    action.clone(),
+                    action,
                     dragonos_dir.clone(),
                     zero_entity.last().unwrap().clone(),
                 )
@@ -534,7 +540,7 @@ impl Scheduler {
                     }
                     return false;
                 }
-                return true;
+                true
             })
         }
     }
@@ -564,10 +570,9 @@ impl Scheduler {
         for entity in self.target.entities().iter() {
             for dependency in entity.task().depends.iter() {
                 let name_version = (dependency.name.clone(), dependency.version.clone());
-                if !self
+                if self
                     .target
-                    .get_by_name_version(&name_version.0, &name_version.1)
-                    .is_some()
+                    .get_by_name_version(&name_version.0, &name_version.1).is_none()
                 {
                     return Err(SchedulerError::DependencyNotFound(
                         entity.clone(),
@@ -577,7 +582,7 @@ impl Scheduler {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -634,7 +639,7 @@ impl DependencyCycleError {
         let mut tmp = self.dependencies.clone();
         tmp.reverse();
 
-        let mut ret = format!("Dependency cycle detected: \nStart ->\n");
+        let mut ret = "Dependency cycle detected: \nStart ->\n".to_string();
         for (current, dep) in tmp.iter() {
             ret.push_str(&format!(
                 "->\t{} ({})\t--depends-->\t{} ({})\n",
@@ -645,6 +650,6 @@ impl DependencyCycleError {
             ));
         }
         ret.push_str("-> End");
-        return ret;
+        ret
     }
 }
