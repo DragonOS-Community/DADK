@@ -7,122 +7,6 @@ use crate::utils::abs_path;
 
 const LOOP_DEVICE_LOSETUP_A_REGEX: &str = r"^/dev/loop(\d+)";
 
-#[derive(Debug)]
-pub enum LoopError {
-    InvalidUtf8,
-    ImageNotFound,
-    LoopDeviceNotFound,
-    NoMapperAvailable,
-    NoPartitionAvailable,
-    Losetup(String),
-    Kpartx(String),
-    #[allow(dead_code)]
-    Other(anyhow::Error),
-}
-
-impl From<std::string::FromUtf8Error> for LoopError {
-    fn from(_: std::string::FromUtf8Error) -> Self {
-        LoopError::InvalidUtf8
-    }
-}
-
-impl std::fmt::Display for LoopError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoopError::InvalidUtf8 => write!(f, "Invalid UTF-8"),
-            LoopError::ImageNotFound => write!(f, "Image not found"),
-            LoopError::LoopDeviceNotFound => write!(f, "Loop device not found"),
-            LoopError::NoMapperAvailable => write!(f, "No mapper available"),
-            LoopError::NoPartitionAvailable => write!(f, "No partition available"),
-            LoopError::Losetup(err) => write!(f, "Losetup error: {}", err),
-            LoopError::Kpartx(err) => write!(f, "Kpartx error: {}", err),
-            LoopError::Other(err) => write!(f, "Other error: {}", err),
-        }
-    }
-}
-
-impl std::error::Error for LoopError {}
-
-pub struct LoopDeviceBuilder {
-    img_path: Option<PathBuf>,
-    // loop_device_path: Option<String>,
-    detach_on_drop: bool,
-}
-
-impl LoopDeviceBuilder {
-    pub fn new() -> Self {
-        LoopDeviceBuilder {
-            img_path: None,
-            // loop_device_path: None,
-            detach_on_drop: true,
-        }
-    }
-
-    pub fn img_path(mut self, img_path: PathBuf) -> Self {
-        self.img_path = Some(abs_path(&img_path));
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn detach_on_drop(mut self, detach_on_drop: bool) -> Self {
-        self.detach_on_drop = detach_on_drop;
-        self
-    }
-
-    pub fn build(self) -> Result<LoopDevice, LoopError> {
-        if self.img_path.is_none() {
-            return Err(LoopError::ImageNotFound);
-        }
-
-        let img_path = self.img_path.unwrap();
-
-        log::trace!(
-            "Try to attach loop device by exists: image path: {}",
-            img_path.display()
-        );
-
-        let loop_device = LoopDevice::new(img_path, self.detach_on_drop)?;
-        return Ok(loop_device);
-    }
-}
-
-fn attach_loop_by_image(img_path: &str) -> Result<String, LoopError> {
-    LosetupCmd::new()
-        .arg("-f")
-        .arg("--show")
-        .arg("-P")
-        .arg(img_path)
-        .output()
-        .map(|output_path| output_path.trim().to_string())
-}
-
-fn attach_exists_loop_by_image(img_path: &str) -> Result<String, LoopError> {
-    // losetup -a 查看是否有已经attach了的，如果有，就附着上去
-    let output = LosetupCmd::new().arg("-a").output()?;
-
-    __loop_device_path_by_disk_image_path(img_path, &output)
-}
-
-fn __loop_device_path_by_disk_image_path(
-    disk_img_path: &str,
-    losetup_a_output: &str,
-) -> Result<String, LoopError> {
-    let re = Regex::new(LOOP_DEVICE_LOSETUP_A_REGEX).unwrap();
-    for line in losetup_a_output.lines() {
-        if !line.contains(disk_img_path) {
-            continue;
-        }
-        let caps = re.captures(line);
-        if caps.is_none() {
-            continue;
-        }
-        let caps = caps.unwrap();
-        let loop_device = caps.get(1).unwrap().as_str().trim();
-        let loop_device = format!("/dev/loop{}", loop_device);
-        return Ok(loop_device);
-    }
-    Err(LoopError::LoopDeviceNotFound)
-}
 
 pub struct LoopDevice {
     path: PathBuf,
@@ -187,7 +71,6 @@ impl LoopDevice {
     //     self.detach_on_drop = detach_on_drop;
     // }
 }
-
 impl Drop for LoopDevice {
     fn drop(&mut self) {
         if !self.detach_on_drop {
@@ -206,6 +89,132 @@ impl Drop for LoopDevice {
         }
     }
 }
+
+pub struct LoopDeviceBuilder {
+    img_path: Option<PathBuf>,
+    // loop_device_path: Option<String>,
+    detach_on_drop: bool,
+}
+
+impl LoopDeviceBuilder {
+    pub fn new() -> Self {
+        LoopDeviceBuilder {
+            img_path: None,
+            // loop_device_path: None,
+            detach_on_drop: true,
+        }
+    }
+
+    pub fn img_path(mut self, img_path: PathBuf) -> Self {
+        self.img_path = Some(abs_path(&img_path));
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn detach_on_drop(mut self, detach_on_drop: bool) -> Self {
+        self.detach_on_drop = detach_on_drop;
+        self
+    }
+
+    pub fn build(self) -> Result<LoopDevice, LoopError> {
+        if self.img_path.is_none() {
+            return Err(LoopError::ImageNotFound);
+        }
+
+        let img_path = self.img_path.unwrap();
+
+        log::trace!(
+            "Try to attach loop device by exists: image path: {}",
+            img_path.display()
+        );
+
+        let loop_device = LoopDevice::new(img_path, self.detach_on_drop)?;
+        return Ok(loop_device);
+    }
+}
+
+
+fn __loop_device_path_by_disk_image_path(
+    disk_img_path: &str,
+    losetup_a_output: &str,
+) -> Result<String, LoopError> {
+    let re = Regex::new(LOOP_DEVICE_LOSETUP_A_REGEX).unwrap();
+    for line in losetup_a_output.lines() {
+        if !line.contains(disk_img_path) {
+            continue;
+        }
+        let caps = re.captures(line);
+        if caps.is_none() {
+            continue;
+        }
+        let caps = caps.unwrap();
+        let loop_device = caps.get(1).unwrap().as_str().trim();
+        let loop_device = format!("/dev/loop{}", loop_device);
+        return Ok(loop_device);
+    }
+    Err(LoopError::LoopDeviceNotFound)
+} 
+#[derive(Debug)]
+pub enum LoopError {
+    InvalidUtf8,
+    ImageNotFound,
+    LoopDeviceNotFound,
+    NoMapperAvailable,
+    NoPartitionAvailable,
+    Losetup(String),
+    Kpartx(String),
+    #[allow(dead_code)]
+    Other(anyhow::Error),
+}
+
+impl From<std::string::FromUtf8Error> for LoopError {
+    fn from(_: std::string::FromUtf8Error) -> Self {
+        LoopError::InvalidUtf8
+    }
+}
+
+impl std::fmt::Display for LoopError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoopError::InvalidUtf8 => write!(f, "Invalid UTF-8"),
+            LoopError::ImageNotFound => write!(f, "Image not found"),
+            LoopError::LoopDeviceNotFound => write!(f, "Loop device not found"),
+            LoopError::NoMapperAvailable => write!(f, "No mapper available"),
+            LoopError::NoPartitionAvailable => write!(f, "No partition available"),
+            LoopError::Losetup(err) => write!(f, "Losetup error: {}", err),
+            LoopError::Kpartx(err) => write!(f, "Kpartx error: {}", err),
+            LoopError::Other(err) => write!(f, "Other error: {}", err),
+        }
+    }
+}
+
+impl std::error::Error for LoopError {}
+
+
+
+
+fn attach_loop_by_image(img_path: &str) -> Result<String, LoopError> {
+    LosetupCmd::new()
+        .arg("-f")
+        .arg("--show")
+        .arg("-P")
+        .arg(img_path)
+        .output()
+        .map(|output_path| output_path.trim().to_string())
+}
+
+fn attach_exists_loop_by_image(img_path: &str) -> Result<String, LoopError> {
+    // losetup -a 查看是否有已经attach了的，如果有，就附着上去
+    let output = LosetupCmd::new().arg("-a").output()?;
+
+    __loop_device_path_by_disk_image_path(img_path, &output)
+}
+
+
+
+
+
+
 
 struct LosetupCmd {
     inner: Command,

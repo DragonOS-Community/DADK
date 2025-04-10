@@ -6,7 +6,7 @@ authors = [
     "xuzihao <xuzihao@DragonOS.org>"
 ]
 
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "DragonOS Application Development Kit\nDragonOS应用开发工具"
 license = "GPL-2.0-only"
