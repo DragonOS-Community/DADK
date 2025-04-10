@@ -1,3 +1,4 @@
+use std::sync::OnceLock;
 use std::{fs::File, io::Write, mem::ManuallyDrop, path::PathBuf, process::Command};
 
 use crate::context::DADKExecContext;
@@ -6,6 +7,23 @@ use dadk_config::rootfs::{fstype::FsType, partition::PartitionType};
 
 use super::loopdev_v1::LoopDeviceBuilder as LoopDeviceBuilderV1;
 use super::loopdev_v2::LoopDeviceBuilder as LoopDeviceBuilderV2;
+use crate::actions::rootfs::BuilderVersion;
+pub static BUILDER_VERSION: OnceLock<BuilderVersion> = OnceLock::new();
+
+pub fn set_builder_version(ctx: &DADKExecContext) {
+    let version = BuilderVersion::from_str(ctx.manifest().metadata.builder_version.as_str());
+    BUILDER_VERSION.set(version).expect("Failed to set builder version");
+    log::info!("Current builder version: {:?}", get_builder_version());
+}
+pub fn get_builder_version() -> BuilderVersion{
+    log::info!("Current builder version: {:?}", BUILDER_VERSION.get());
+
+    BUILDER_VERSION.get()
+                    .cloned()
+                    .unwrap_or(BuilderVersion::V1) 
+}  
+
+   
 pub(super) fn create(ctx: &DADKExecContext, skip_if_exists: bool) -> Result<()> {
     let disk_image_path = ctx.disk_image_path();
     if disk_image_path.exists() {
@@ -242,137 +260,33 @@ impl DiskFormatter {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::io::Read;
-    use tempfile::NamedTempFile;
 
-    #[test]
-    fn test_create_raw_img_functional() -> Result<()> {
-        // 创建一个临时文件路径
-        let temp_file = NamedTempFile::new()?;
-        let disk_image_path = temp_file.path().to_path_buf();
-        let disk_image_size = 1024 * 1024usize;
-
-        // 调用函数
-        create_raw_img(&disk_image_path, disk_image_size)?;
-
-        // 验证文件大小
-        let metadata = fs::metadata(&disk_image_path)?;
-        assert_eq!(metadata.len(), disk_image_size as u64);
-
-        // 验证文件内容是否全为0
-        let mut file = File::open(&disk_image_path)?;
-        let mut buffer = vec![0u8; 4096];
-        let mut all_zeros = true;
-
-        while file.read(&mut buffer)? > 0 {
-            for byte in &buffer {
-                if *byte != 0 {
-                    all_zeros = false;
-                    break;
-                }
-            }
-        }
-
-        assert!(all_zeros, "File content is not all zeros");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_format_fat32() {
-        // Create a temporary file to use as the disk image
-        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        let disk_image_path = temp_file.path().to_path_buf();
-
-        // 16MB
-        let image_size = 16 * 1024 * 1024usize;
-        create_raw_img(&disk_image_path, image_size).expect("Failed to create raw disk image");
-
-        // Call the function to format the disk image
-        DiskFormatter::format_disk(&disk_image_path, &FsType::Fat32)
-            .expect("Failed to format disk image as FAT32");
-
-        // Optionally, you can check if the disk image was actually formatted as FAT32
-        // by running a command to inspect the filesystem type
-        let output = Command::new("file")
-            .arg("-sL")
-            .arg(&disk_image_path)
-            .output()
-            .expect("Failed to execute 'file' command");
-
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            output_str.contains("FAT (32 bit)"),
-            "Disk image is not formatted as FAT32"
-        );
-    }
-
-    #[test]
-    fn test_create_mbr_partitioned_image() -> Result<()> {
-        // Create a temporary file to use as the disk image
-        let temp_file = NamedTempFile::new()?;
-        let disk_image_path = temp_file.path().to_path_buf();
-
-        eprintln!("Disk image path: {:?}", disk_image_path);
-        // Create a raw disk image
-        let disk_image_size = 16 * 1024 * 1024usize; // 16MB
-        create_raw_img(&disk_image_path, disk_image_size)?;
-
-        // Call the function to create the MBR partitioned image
-        DiskPartitioner::create_mbr_partitioned_image(&disk_image_path)?;
-
-        // Verify the disk image has been correctly partitioned
-        let output = Command::new("fdisk")
-            .env("LANG", "C") // Set LANG to C to force English output
-            .env("LC_ALL", "C") // Set LC_ALL to C to force English output
-            .arg("-l")
-            .arg(&disk_image_path)
-            .output()
-            .expect("Failed to execute 'fdisk -l' command");
-
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            output_str.contains("Disklabel type: dos"),
-            "Disk image does not have an MBR partition table"
-        );
-        assert!(
-            output_str.contains("Start"),
-            "Disk image does not have a partition"
-        );
-
-        Ok(())
-    }
-}
 fn mount_partitioned_image(
     ctx: &DADKExecContext,
     disk_image_path: &PathBuf,
     disk_mount_path: &PathBuf,
 ) -> Result<()> {
-    match ctx.manifest().metadata.builder_version.as_str() {
-        "v2" => mount_partitioned_image_v2(ctx, disk_image_path, disk_mount_path),
-        "v1" | _ => mount_partitioned_image_v1(ctx, disk_image_path, disk_mount_path),
+    match get_builder_version() {
+        BuilderVersion::V2 => mount_partitioned_image_v2(ctx, disk_image_path, disk_mount_path),
+        BuilderVersion::V1 => mount_partitioned_image_v1(ctx, disk_image_path, disk_mount_path),
     }
 }
 fn create_partitioned_image(
     ctx: &DADKExecContext,
     disk_image_path: &PathBuf,
 ) -> Result<()> {
-    match ctx.manifest().metadata.builder_version.as_str() {
-        "v2" => create_partitioned_image_v2(ctx, disk_image_path),
-        "v1" | _ => create_partitioned_image_v1(ctx, disk_image_path),
-    }
+    match get_builder_version() {
+        BuilderVersion::V2 => create_partitioned_image_v2(ctx, disk_image_path),
+        BuilderVersion::V1 => create_partitioned_image_v1(ctx, disk_image_path),   
+    } 
 }
 
 
 pub fn show_loop_device(ctx: &DADKExecContext) -> Result<()> {
-    match ctx.manifest().metadata.builder_version.as_str() {
-        "v2" => show_loop_device_v2(ctx),
-        "v1" | _ => show_loop_device_v1(ctx),
-    }
+    match BUILDER_VERSION.get().expect("Builder version is not set").clone() {
+        BuilderVersion::V2 => show_loop_device_v2(ctx),
+        BuilderVersion::V1 => show_loop_device_v1(ctx),   
+        } 
 }
 
 fn mount_partitioned_image_v1(
@@ -416,11 +330,10 @@ fn mount_partitioned_image_v2(
     Ok(())
 }
 pub fn umount(ctx: &DADKExecContext) -> Result<()> {
-    match ctx.manifest().metadata.builder_version.as_str() {
-        "v2" => umount_v2(ctx),
-        "v1" | _ => umount_v1(ctx),
-    }
-    
+    match get_builder_version() {
+    BuilderVersion::V2 => umount_v2(ctx),
+    BuilderVersion::V1 => umount_v1(ctx),   
+    }   
 }
 pub fn umount_v1(ctx: &DADKExecContext) -> Result<()> {
     let disk_img_path = ctx.disk_image_path();
@@ -556,4 +469,109 @@ pub fn show_loop_device_v2(ctx: &DADKExecContext) -> Result<()> {
         .build()?;
     println!("{}", loop_device.dev_path());
     Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Read;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_create_raw_img_functional() -> Result<()> {
+        // 创建一个临时文件路径
+        let temp_file = NamedTempFile::new()?;
+        let disk_image_path = temp_file.path().to_path_buf();
+        let disk_image_size = 1024 * 1024usize;
+
+        // 调用函数
+        create_raw_img(&disk_image_path, disk_image_size)?;
+
+        // 验证文件大小
+        let metadata = fs::metadata(&disk_image_path)?;
+        assert_eq!(metadata.len(), disk_image_size as u64);
+
+        // 验证文件内容是否全为0
+        let mut file = File::open(&disk_image_path)?;
+        let mut buffer = vec![0u8; 4096];
+        let mut all_zeros = true;
+
+        while file.read(&mut buffer)? > 0 {
+            for byte in &buffer {
+                if *byte != 0 {
+                    all_zeros = false;
+                    break;
+                }
+            }
+        }
+
+        assert!(all_zeros, "File content is not all zeros");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_format_fat32() {
+        // Create a temporary file to use as the disk image
+        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let disk_image_path = temp_file.path().to_path_buf();
+
+        // 16MB
+        let image_size = 16 * 1024 * 1024usize;
+        create_raw_img(&disk_image_path, image_size).expect("Failed to create raw disk image");
+
+        // Call the function to format the disk image
+        DiskFormatter::format_disk(&disk_image_path, &FsType::Fat32)
+            .expect("Failed to format disk image as FAT32");
+
+        // Optionally, you can check if the disk image was actually formatted as FAT32
+        // by running a command to inspect the filesystem type
+        let output = Command::new("file")
+            .arg("-sL")
+            .arg(&disk_image_path)
+            .output()
+            .expect("Failed to execute 'file' command");
+
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output_str.contains("FAT (32 bit)"),
+            "Disk image is not formatted as FAT32"
+        );
+    }
+
+    #[test]
+    fn test_create_mbr_partitioned_image() -> Result<()> {
+        // Create a temporary file to use as the disk image
+        let temp_file = NamedTempFile::new()?;
+        let disk_image_path = temp_file.path().to_path_buf();
+
+        eprintln!("Disk image path: {:?}", disk_image_path);
+        // Create a raw disk image
+        let disk_image_size = 16 * 1024 * 1024usize; // 16MB
+        create_raw_img(&disk_image_path, disk_image_size)?;
+
+        // Call the function to create the MBR partitioned image
+        DiskPartitioner::create_mbr_partitioned_image(&disk_image_path)?;
+
+        // Verify the disk image has been correctly partitioned
+        let output = Command::new("fdisk")
+            .env("LANG", "C") // Set LANG to C to force English output
+            .env("LC_ALL", "C") // Set LC_ALL to C to force English output
+            .arg("-l")
+            .arg(&disk_image_path)
+            .output()
+            .expect("Failed to execute 'fdisk -l' command");
+
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output_str.contains("Disklabel type: dos"),
+            "Disk image does not have an MBR partition table"
+        );
+        assert!(
+            output_str.contains("Start"),
+            "Disk image does not have a partition"
+        );
+
+        Ok(())
+    }
 }

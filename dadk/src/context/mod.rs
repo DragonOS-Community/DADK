@@ -12,7 +12,8 @@ use crate::{
     console::CommandLineArgs,
     utils::{abs_path, check_dir_exists},
 };
-
+use crate::actions::rootfs::disk_img::get_builder_version;
+use crate::actions::rootfs::BuilderVersion;
 mod manifest;
 
 /// DADK的执行上下文
@@ -92,16 +93,50 @@ impl DADKExecContext {
         self.manifest().metadata.arch
     }
 
-    /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成
     pub fn disk_image_path(&self) -> PathBuf {
+        match get_builder_version() {
+            BuilderVersion::V1 => self.disk_image_path_v1(),
+            BuilderVersion::V2 => self.disk_image_path_v2(),
+        }
+    }
+    /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成
+    pub fn disk_image_path_v2(&self) -> PathBuf {
         self.workdir()
-            .join(format!("bin/{}/disk.img", self.target_arch()))
+            .join(format!("bin/{}/disk.img", self.target_arch()))//这个是新版本路径
+    }
+    
+    /// 获取磁盘挂载路径
+    
+    pub fn disk_image_path_v1(&self) -> PathBuf {
+        self.workdir()
+            .join(format!("bin/{}.img", self.disk_image_basename_v1()))//这个是旧版本路径
     }
 
-    /// 获取磁盘挂载路径
+
+
     pub fn disk_mount_path(&self) -> PathBuf {
+        
+        match get_builder_version() {
+            BuilderVersion::V1 => self.disk_mount_path_v1(),
+            BuilderVersion::V2 => self.disk_mount_path_v2(),            
+        }  
+    }
+    
+    pub fn disk_mount_path_v2(&self) -> PathBuf {
         self.workdir()
             .join(format!("bin/{}/mnt", self.target_arch()))
+    }
+
+
+    /// 获取磁盘挂载路径
+    pub fn disk_mount_path_v1(&self) -> PathBuf {
+        self.workdir()
+            .join(format!("bin/mnt/{}", self.disk_image_basename_v1()))
+    }
+
+    fn disk_image_basename_v1(&self) -> String {
+        let arch: String = self.target_arch().into();
+        format!("disk-image-{}", arch)
     }
 
     /// 获取磁盘镜像大小
