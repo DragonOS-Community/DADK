@@ -256,7 +256,7 @@ mod tests {
         temp_file.write_all(toml_content.as_bytes())?;
         let path = temp_file.path().to_path_buf();
         let manifest = DadkManifestFile::load(&path)?;
-        assert_eq!(manifest.used_default, true);
+        assert!(manifest.used_default);
         assert_eq!(
             manifest.metadata.rootfs_config,
             PathBuf::from("config/rootfs.toml")

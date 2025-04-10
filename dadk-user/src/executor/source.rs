@@ -53,17 +53,13 @@ impl GitSource {
             return Err(Error::msg("branch and revision are both specified"));
         }
 
-        if self.branch.is_some() {
-            if self.branch.as_ref().unwrap().is_empty() {
-                return Err(Error::msg("branch is empty"));
-            }
+        if self.branch.is_some() && self.branch.as_ref().unwrap().is_empty() {
+            return Err(Error::msg("branch is empty"));
         }
-        if self.revision.is_some() {
-            if self.revision.as_ref().unwrap().is_empty() {
-                return Err(Error::msg("revision is empty"));
-            }
+        if self.revision.is_some() && self.revision.as_ref().unwrap().is_empty() {
+            return Err(Error::msg("revision is empty"));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {
@@ -116,7 +112,7 @@ impl GitSource {
 
         self.pull(target_dir)?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn check_repo(&self, target_dir: &CacheDir) -> Result<bool, String> {
@@ -140,11 +136,11 @@ impl GitSource {
             r.pop();
             Ok(r == self.url)
         } else {
-            return Err(format!(
+            Err(format!(
                 "git remote get-url origin failed, status: {:?},  stderr: {:?}",
                 output.status,
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-            ));
+            ))
         }
     }
 
@@ -236,10 +232,10 @@ impl GitSource {
                     String::from_utf8_lossy(&suboutput.stdout)
                 ));
             }
-            return Ok(());
+            Ok(())
         };
 
-        if let Err(_) = do_checkout() {
+        if do_checkout().is_err() {
             // 如果切换分支失败，则尝试重新fetch
             if self.revision.is_some() {
                 self.set_fetch_config(target_dir)?;
@@ -250,7 +246,7 @@ impl GitSource {
             do_checkout()?;
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn clone_repo(&self, cache_dir: &CacheDir) -> Result<(), String> {
@@ -308,7 +304,7 @@ impl GitSource {
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&suboutput.stderr), 5)
             ));
         }
-        return Ok(());
+        Ok(())
     }
 
     /// 设置fetch所有分支
@@ -333,11 +329,11 @@ impl GitSource {
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
             ));
         }
-        return Ok(());
+        Ok(())
     }
     /// # 把浅克隆的仓库变成深克隆
     fn unshallow(&self, target_dir: &CacheDir) -> Result<(), String> {
-        if self.is_shallow(target_dir)? == false {
+        if !(self.is_shallow(target_dir)?) {
             return Ok(());
         }
 
@@ -361,7 +357,7 @@ impl GitSource {
                 StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
             ));
         }
-        return Ok(());
+        Ok(())
     }
 
     /// 判断当前仓库是否是浅克隆
@@ -385,7 +381,7 @@ impl GitSource {
         }
 
         let is_shallow = String::from_utf8_lossy(&output.stdout).trim() == "true";
-        return Ok(is_shallow);
+        Ok(is_shallow)
     }
 
     fn fetch_all(&self, target_dir: &CacheDir) -> Result<(), String> {
@@ -412,12 +408,12 @@ impl GitSource {
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn pull(&self, target_dir: &CacheDir) -> Result<(), String> {
         // 如果没有指定branch，则不执行pull
-        if !self.branch.is_some() {
+        if self.branch.is_none() {
             return Ok(());
         }
         info!("git pulling: {}", target_dir.path.display());
@@ -445,7 +441,7 @@ impl GitSource {
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -480,7 +476,7 @@ impl LocalSource {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {}
@@ -518,7 +514,7 @@ impl ArchiveSource {
         } else {
             return Err(Error::msg(format!("url {:?} is not a valid url", self.url)));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {
@@ -565,7 +561,7 @@ impl ArchiveSource {
         archive_file.unzip()?;
         //删除创建的临时文件夹
         std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -642,7 +638,7 @@ impl ArchiveFile {
             }
 
             ArchiveType::Zip => {
-                let file = File::open(&self.archive_path.join(&self.archive_name))
+                let file = File::open(self.archive_path.join(&self.archive_name))
                     .map_err(|e| e.to_string())?;
                 let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
                 for i in 0..archive.len() {
@@ -656,7 +652,7 @@ impl ArchiveFile {
                     } else {
                         if let Some(p) = outpath.parent() {
                             if !p.exists() {
-                                std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                                std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
                             }
                         }
                         let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
@@ -686,12 +682,12 @@ impl ArchiveFile {
         for entry in path.read_dir().map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            FileUtils::move_files(&path, &self.archive_path.parent().unwrap())
+            FileUtils::move_files(&path, self.archive_path.parent().unwrap())
                 .map_err(|e| e.to_string())?;
             //删除空的单独文件夹
             std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
         }
-        return Ok(());
+        Ok(())
     }
 }
 

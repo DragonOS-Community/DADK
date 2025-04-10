@@ -89,7 +89,7 @@ impl Executor {
             dragonos_sysroot,
         };
 
-        return Ok(result);
+        Ok(result)
     }
 
     /// # 执行任务
@@ -107,7 +107,7 @@ impl Executor {
         let r = self.do_execute();
         self.save_task_data(r.clone());
         info!("Task {} finished", self.entity.task().name_version());
-        return r;
+        r
     }
 
     /// # 保存任务数据
@@ -174,7 +174,7 @@ impl Executor {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn pre_build(&mut self) -> Result<(), ExecutorError> {
@@ -217,7 +217,7 @@ impl Executor {
             }
         }
 
-        return self.do_build();
+        self.do_build()
     }
 
     fn post_build(&mut self) -> Result<(), ExecutorError> {
@@ -256,7 +256,7 @@ impl Executor {
                 self.entity.task().name_version(),
             );
         }
-        return Ok(());
+        Ok(())
     }
 
     fn install(&self) -> Result<(), ExecutorError> {
@@ -284,7 +284,7 @@ impl Executor {
             "dadk-user: to do install {}",
             self.entity.task().name_version()
         );
-        return self.do_install();
+        self.do_install()
     }
 
     /// # 执行安装操作，把构建结果安装到DragonOS
@@ -309,16 +309,16 @@ impl Executor {
         debug!("install_path: {:?}", install_path);
         // 创建安装路径
         std::fs::create_dir_all(&install_path).map_err(|e| {
-            ExecutorError::InstallError(format!("Failed to create install path: {}", e.to_string()))
+            ExecutorError::InstallError(format!("Failed to create install path: {}", e))
         })?;
 
         // 拷贝构建结果到安装路径
         let build_dir: PathBuf = self.build_dir.path.clone();
         FileUtils::copy_dir_all(&build_dir, &install_path)
-            .map_err(|e| ExecutorError::InstallError(e))?;
+            .map_err(ExecutorError::InstallError)?;
         info!("Task {} installed.", self.entity.task().name_version());
 
-        return Ok(());
+        Ok(())
     }
 
     fn clean(&self) -> Result<(), ExecutorError> {
@@ -353,7 +353,7 @@ impl Executor {
             return Err(e);
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn clean_all(&self) -> Result<(), ExecutorError> {
@@ -363,7 +363,7 @@ impl Executor {
         self.clean_target()?;
         // 清理缓存
         self.clean_cache()?;
-        return Ok(());
+        Ok(())
     }
 
     /// 在源文件目录执行清理
@@ -381,7 +381,7 @@ impl Executor {
 
         let cmd = cmd.unwrap();
         self.run_command(cmd)?;
-        return Ok(());
+        Ok(())
     }
 
     /// 清理构建输出目录
@@ -392,7 +392,7 @@ impl Executor {
             self.build_dir.path
         );
 
-        return self.build_dir.remove_self_recursive();
+        self.build_dir.remove_self_recursive()
     }
 
     /// 清理下载缓存
@@ -407,7 +407,7 @@ impl Executor {
             self.entity.task().name_version(),
             self.src_work_dir().display()
         );
-        return cache_dir.unwrap().remove_self_recursive();
+        cache_dir.unwrap().remove_self_recursive()
     }
 
     /// 获取源文件的工作目录
@@ -419,7 +419,7 @@ impl Executor {
     }
 
     fn task_log(&self) -> TaskLog {
-        return self.task_data_dir.task_log();
+        self.task_data_dir.task_log()
     }
 
     /// 为任务创建命令
@@ -472,7 +472,7 @@ impl Executor {
             command.env(key, value.value.clone());
         }
 
-        return Ok(Some(command));
+        Ok(Some(command))
     }
 
     /// # 准备工作线程本地环境变量
@@ -493,7 +493,7 @@ impl Executor {
             self.build_dir.path.to_str().unwrap().to_string(),
         ));
 
-        return Ok(());
+        Ok(())
     }
 
     fn prepare_input(&self) -> Result<(), ExecutorError> {
@@ -508,7 +508,7 @@ impl Executor {
                 match cs {
                     CodeSource::Git(git) => {
                         git.prepare(source_dir)
-                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                            .map_err(ExecutorError::PrepareEnvError)?;
                     }
                     // 本地源文件，不需要拉取
                     CodeSource::Local(_) => return Ok(()),
@@ -516,7 +516,7 @@ impl Executor {
                     CodeSource::Archive(archive) => {
                         archive
                             .download_unzip(source_dir)
-                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                            .map_err(ExecutorError::PrepareEnvError)?;
                     }
                 }
             }
@@ -526,21 +526,21 @@ impl Executor {
                     PrebuiltSource::Local(local_source) => {
                         let local_path = local_source.path();
                         let target_path = &self.build_dir.path;
-                        FileUtils::copy_dir_all(&local_path, &target_path)
-                            .map_err(|e| ExecutorError::TaskFailed(e))?; // let mut cmd = "cp -r ".to_string();
+                        FileUtils::copy_dir_all(local_path, target_path)
+                            .map_err(ExecutorError::TaskFailed)?; // let mut cmd = "cp -r ".to_string();
                         return Ok(());
                     }
                     // 在线压缩包，需要下载
                     PrebuiltSource::Archive(archive) => {
                         archive
                             .download_unzip(&self.build_dir)
-                            .map_err(|e| ExecutorError::PrepareEnvError(e))?;
+                            .map_err(ExecutorError::PrepareEnvError)?;
                     }
                 }
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn run_command(&self, mut command: Command) -> Result<(), ExecutorError> {
@@ -557,7 +557,7 @@ impl Executor {
         if r.is_ok() {
             let r = r.unwrap();
             if r.success() {
-                return Ok(());
+                Ok(())
             } else {
                 // 执行失败，获取最后100行stderr输出
                 let errmsg = format!(
@@ -584,7 +584,7 @@ impl Executor {
                 for line in last_100_outputs {
                     error!("{}", line);
                 }
-                return Err(ExecutorError::TaskFailed(errmsg));
+                Err(ExecutorError::TaskFailed(errmsg))
             }
         } else {
             let errmsg = format!(
@@ -593,7 +593,7 @@ impl Executor {
                 r.err().unwrap()
             );
             error!("{errmsg}");
-            return Err(ExecutorError::TaskFailed(errmsg));
+            Err(ExecutorError::TaskFailed(errmsg))
         }
     }
 }
@@ -601,6 +601,12 @@ impl Executor {
 #[derive(Debug, Clone)]
 pub struct EnvMap {
     pub envs: BTreeMap<String, EnvVar>,
+}
+
+impl Default for EnvMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EnvMap {
@@ -664,7 +670,7 @@ pub fn prepare_env(
     // 写入全局环境变量列表
     let mut global_env_list = ENV_LIST.write().unwrap();
     *global_env_list = env_list;
-    return Ok(());
+    Ok(())
 }
 
 /// # 创建全局环境变量列表
@@ -681,7 +687,7 @@ fn create_global_env_list(
         // 导出任务的构建目录环境变量
         let build_dir = CacheDir::build_dir(entity.clone())?;
 
-        let build_dir_key = CacheDir::build_dir_env_key(&entity)?;
+        let build_dir_key = CacheDir::build_dir_env_key(entity)?;
         env_list.add(EnvVar::new(
             build_dir_key,
             build_dir.to_str().unwrap().to_string(),
@@ -690,7 +696,7 @@ fn create_global_env_list(
         // 如果需要源码缓存目录，则导出
         if CacheDir::need_source_cache(entity) {
             let source_dir = CacheDir::source_dir(entity.clone())?;
-            let source_dir_key = CacheDir::source_dir_env_key(&entity)?;
+            let source_dir_key = CacheDir::source_dir_env_key(entity)?;
             env_list.add(EnvVar::new(
                 source_dir_key,
                 source_dir.to_str().unwrap().to_string(),
@@ -702,7 +708,7 @@ fn create_global_env_list(
     let target_arch = execute_ctx.target_arch();
     env_list.add(EnvVar::new("ARCH".to_string(), (*target_arch).into()));
 
-    return Ok(env_list);
+    Ok(env_list)
 }
 
 /// # 获取文件最后的更新时间

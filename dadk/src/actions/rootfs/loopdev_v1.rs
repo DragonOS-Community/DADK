@@ -145,7 +145,7 @@ impl LoopDevice {
 
         let output = Command::new("losetup").arg("-d").arg(&loop_device).output();
 
-        if !output.is_ok() {
+        if output.is_err() {
             log::error!(
                 "losetup failed to detach loop device [{}]: {}",
                 &loop_device,

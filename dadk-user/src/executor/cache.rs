@@ -86,7 +86,7 @@ pub fn cache_root_init(path: Option<PathBuf>) -> Result<(), ExecutorError> {
     // 设置环境变量
     std::env::set_var("DADK_CACHE_ROOT", CACHE_ROOT.get().to_str().unwrap());
     info!("Cache root dir: {:?}", CACHE_ROOT.get());
-    return Ok(());
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -122,7 +122,7 @@ impl CacheDir {
 
         result.create()?;
 
-        return Ok(result);
+        Ok(result)
     }
 
     fn get_path(task: &DADKTask, cache_type: CacheDirType) -> PathBuf {
@@ -147,29 +147,29 @@ impl CacheDir {
     }
 
     pub fn build_dir(entity: Arc<SchedEntity>) -> Result<PathBuf, ExecutorError> {
-        return Ok(Self::new(entity.clone(), CacheDirType::Build)?.path);
+        Ok(Self::new(entity.clone(), CacheDirType::Build)?.path)
     }
 
     pub fn source_dir(entity: Arc<SchedEntity>) -> Result<PathBuf, ExecutorError> {
-        return Ok(Self::new(entity.clone(), CacheDirType::Source)?.path);
+        Ok(Self::new(entity.clone(), CacheDirType::Source)?.path)
     }
 
     pub fn build_dir_env_key(entity: &Arc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
-        return Ok(format!(
+        Ok(format!(
             "{}_{}",
             Self::DADK_BUILD_CACHE_DIR_ENV_KEY_PREFIX,
             name_version_env
-        ));
+        ))
     }
 
     pub fn source_dir_env_key(entity: &Arc<SchedEntity>) -> Result<String, ExecutorError> {
         let name_version_env = entity.task().name_version_env();
-        return Ok(format!(
+        Ok(format!(
             "{}_{}",
             Self::DADK_SOURCE_CACHE_DIR_ENV_KEY_PREFIX,
             name_version_env
-        ));
+        ))
     }
 
     pub fn need_source_cache(entity: &Arc<SchedEntity>) -> bool {
@@ -210,7 +210,7 @@ impl CacheDir {
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 
     /// 判断缓存目录是否为空
@@ -223,7 +223,7 @@ impl CacheDir {
             return Ok(false);
         }
 
-        return Ok(true);
+        Ok(true)
     }
 
     /// # 递归删除自身目录
@@ -235,7 +235,7 @@ impl CacheDir {
         if path.exists() {
             std::fs::remove_dir_all(path).map_err(|e| ExecutorError::IoError(e.to_string()))?;
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -248,7 +248,7 @@ impl TaskDataDir {
     const TASK_LOG_FILE_NAME: &'static str = "task_log.toml";
     pub fn new(entity: Arc<SchedEntity>) -> Result<Self, ExecutorError> {
         let dir = CacheDir::new(entity.clone(), CacheDirType::TaskData)?;
-        return Ok(Self { dir });
+        Ok(Self { dir })
     }
 
     /// # 获取任务日志
@@ -257,9 +257,9 @@ impl TaskDataDir {
         if path.exists() {
             let content = std::fs::read_to_string(&path).unwrap();
             let task_log: TaskLog = toml::from_str(&content).unwrap();
-            return task_log;
+            task_log
         } else {
-            return TaskLog::new();
+            TaskLog::new()
         }
     }
 
@@ -267,7 +267,7 @@ impl TaskDataDir {
     pub fn save_task_log(&self, task_log: &TaskLog) -> Result<(), ExecutorError> {
         let path = self.dir.path.join(Self::TASK_LOG_FILE_NAME);
         let content = toml::to_string(task_log).unwrap();
-        std::fs::write(&path, content).map_err(|e| ExecutorError::IoError(e.to_string()))?;
-        return Ok(());
+        std::fs::write(path, content).map_err(|e| ExecutorError::IoError(e.to_string()))?;
+        Ok(())
     }
 }
