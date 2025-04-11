@@ -3,7 +3,7 @@ version = "0.2.0"
 description = "An app targets to all arch"
 build-once = false
 install-once = false
-target-arch = ["riscv64", "x86_64", "aarch64"]
+target-arch = ["riscv64", "x86_64", "aarch64", "loongarch64"]
 
 [task-source]
 type = "build-from-source"
