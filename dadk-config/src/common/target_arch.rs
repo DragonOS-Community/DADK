@@ -7,11 +7,12 @@ pub enum TargetArch {
     X86_64,
     RiscV64,
     AArch64,
+    LoongArch64,
 }
 
 impl TargetArch {
     /// 期望的目标处理器架构（如果修改了枚举，那一定要修改这里）
-    pub const EXPECTED: [&'static str; 3] = ["x86_64", "riscv64", "aarch64"];
+    pub const EXPECTED: [&'static str; 4] = ["x86_64", "riscv64", "aarch64", "loongarch64"];
 }
 
 impl TryFrom<&str> for TargetArch {
@@ -22,6 +23,7 @@ impl TryFrom<&str> for TargetArch {
             "x86_64" => Ok(TargetArch::X86_64),
             "riscv64" => Ok(TargetArch::RiscV64),
             "aarch64" => Ok(TargetArch::AArch64),
+            "loongarch64" => Ok(TargetArch::LoongArch64),
             _ => Err(format!("Unknown target arch: {}", value)),
         }
     }
@@ -33,6 +35,7 @@ impl From<TargetArch> for &str {
             TargetArch::X86_64 => "x86_64",
             TargetArch::RiscV64 => "riscv64",
             TargetArch::AArch64 => "aarch64",
+            TargetArch::LoongArch64 => "loongarch64",
         }
     }
 }
@@ -93,6 +96,9 @@ mod tests {
 
         let aarch64 = TargetArch::try_from("aarch64").unwrap();
         assert_eq!(aarch64, TargetArch::AArch64);
+
+        let loongarch64 = TargetArch::try_from("loongarch64").unwrap();
+        assert_eq!(loongarch64, TargetArch::LoongArch64);
     }
 
     #[test]
@@ -109,6 +115,12 @@ mod tests {
 
         let riscv64: &str = TargetArch::RiscV64.into();
         assert_eq!(riscv64, "riscv64");
+
+        let aarch64: &str = TargetArch::AArch64.into();
+        assert_eq!(aarch64, "aarch64");
+
+        let loongarch64: &str = TargetArch::LoongArch64.into();
+        assert_eq!(loongarch64, "loongarch64");
     }
 
     #[test]
@@ -129,6 +141,15 @@ mod tests {
         let json_riscv64 = r#""riscv64""#;
         let riscv64: TargetArch = serde_json::from_str(json_riscv64).unwrap();
         assert_eq!(riscv64, TargetArch::RiscV64);
+
+        let json_aarch64 = r#""aarch64""#;
+        let aarch64: TargetArch = serde_json::from_str(json_aarch64).unwrap();
+
+        assert_eq!(aarch64, TargetArch::AArch64);
+
+        let json_loongarch64 = r#""loongarch64""#;
+        let loongarch64: TargetArch = serde_json::from_str(json_loongarch64).unwrap();
+        assert_eq!(loongarch64, TargetArch::LoongArch64);
     }
 
     #[test]
