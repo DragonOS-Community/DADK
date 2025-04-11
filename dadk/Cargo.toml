@@ -6,7 +6,7 @@ authors = [
     "xuzihao <xuzihao@DragonOS.org>"
 ]
 
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "DragonOS Application Development Kit\nDragonOS应用开发工具"
 license = "GPL-2.0-only"
@@ -33,8 +33,8 @@ insiders = []
 anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
 clap = { version = "4.5.20", features = ["derive"] }
 crossbeam = "0.8.4"
-dadk-config = { version = "0.2.0", path = "../dadk-config" }
-dadk-user = { version = "0.2.0", path = "../dadk-user" }
+dadk-config = { version = "0.3.0", path = "../dadk-config" }
+dadk-user = { version = "0.3.0", path = "../dadk-user" }
 derive_builder = "0.20.0"
 env_logger = { workspace = true }
 humantime = "2.1.0"

@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "dadk"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -478,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "dadk-config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "dadk-user"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",

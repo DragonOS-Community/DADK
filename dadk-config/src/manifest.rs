@@ -82,8 +82,8 @@ pub struct Metadata {
     pub cache_root_dir: PathBuf,
 
     /// User configuration directory path
-    /// 这个字段只是临时用于兼容旧版本，v0.2版本重构完成后会删除
-    #[deprecated(note = "This field is deprecated and will be removed in DADK 0.2")]
+    /// 这个字段只是临时用于兼容旧版本，v1.0版本重构完成后会删除
+    #[deprecated(note = "This field is deprecated and will be removed in DADK 1.0")]
     #[serde(default = "default_user_config_dir", rename = "user-config-dir")]
     pub user_config_dir: PathBuf,
 }
