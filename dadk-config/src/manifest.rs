@@ -58,6 +58,11 @@ fn check_used_default() -> bool {
 pub struct Metadata {
     /// Target processor architecture
     pub arch: TargetArch,
+
+    /// DADK builder version for isolating unstable features
+    #[serde(default = "default_dadk_builder_version", rename = "builder-version")]
+    pub builder_version: String,
+
     /// Rootfs configuration file path
     #[serde(default = "default_rootfs_config_path", rename = "rootfs-config")]
     pub rootfs_config: PathBuf,
@@ -86,6 +91,10 @@ pub struct Metadata {
     #[deprecated(note = "This field is deprecated and will be removed in DADK 1.0")]
     #[serde(default = "default_user_config_dir", rename = "user-config-dir")]
     pub user_config_dir: PathBuf,
+}
+
+fn default_dadk_builder_version() -> String {
+    "v1".to_string()
 }
 
 /// Returns the default path for the rootfs configuration file.

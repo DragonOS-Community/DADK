@@ -16,7 +16,7 @@ pub struct ProfileSampleArgs {
     #[clap(
         long = "kernel",
         help = "Path to the kernel image to use",
-        default_value = "./bin/kernel/kernel.elf"
+        // default_value = "./bin/kernel/kernel.elf"
     )]
     pub kernel: PathBuf,
     #[clap(
