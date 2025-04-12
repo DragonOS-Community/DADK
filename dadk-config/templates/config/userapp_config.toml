@@ -14,7 +14,7 @@ build-once = false
 install-once = false
 
 # 目标架构
-# 可选值："x86_64", "aarch64", "riscv64"
+# 可选值："x86_64", "aarch64", "riscv64", "loongarch64"
 target-arch = ["x86_64"]
 
 # 任务源

@@ -22,12 +22,12 @@ MIN_DADK_VERSION = 0.2.0
 
 您可以通过以下命令安装dadk:
 ```shell
-cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag <版本号>
+cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag <版本号> --locked
 ```
 
 比如，对于0.2.0版本，您可以使用以下命令安装: `(注意版本号前面有个v)`
 ```shell
-cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.2.0
+cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.2.0 --locked
 ```
 
 ## 打包你的第一个应用
@@ -80,6 +80,8 @@ ifeq ($(ARCH), x86_64)
 	CROSS_COMPILE=x86_64-linux-musl-
 else ifeq ($(ARCH), riscv64)
 	CROSS_COMPILE=riscv64-linux-musl-
+else ifeq ($(ARCH), loongarch64)
+	CROSS_COMPILE=loongarch64-unknown-linux-gnu-
 endif
 
 CC=$(CROSS_COMPILE)gcc
@@ -121,7 +123,7 @@ build-once = false
 #  (可选) 默认: false 是否只安装一次，如果为true，DADK会在安装成功后，不再重复安装
 install-once = false
 # 目标架构
-# 可选值："x86_64", "aarch64", "riscv64"
+# 可选值："x86_64", "aarch64", "riscv64", "loongarch64"
 target-arch = ["x86_64"]
 
 # 任务源
