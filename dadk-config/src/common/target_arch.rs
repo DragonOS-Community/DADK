@@ -83,7 +83,7 @@ impl Display for TargetArch {
             TargetArch::X86_64 => write!(f, "x86_64"),
             TargetArch::RiscV64 => write!(f, "riscv64"),
             TargetArch::AArch64 => write!(f, "aarch64"),
-            TargetArch::LoongArch64 => write!(f, "loongarch64"),    
+            TargetArch::LoongArch64 => write!(f, "loongarch64"),
         }
     }
 }

@@ -38,8 +38,7 @@ fn setup_executor<T: TestContextExt>(config_file: PathBuf, ctx: &T) -> Executor 
 
     assert!(executor.is_ok(), "Create executor error: {:?}", executor);
 
-    let executor = executor.unwrap();
-    executor
+    executor.unwrap()
 }
 
 /// 测试能否正确设置本地环境变量

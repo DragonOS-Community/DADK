@@ -1,5 +1,5 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Once},
 };
 
@@ -143,7 +143,7 @@ impl CacheDir {
                 )
             }
         };
-        abs_path(&PathBuf::from(cache_dir))
+        abs_path(Path::new(&cache_dir))
     }
 
     pub fn build_dir(entity: Arc<SchedEntity>) -> Result<PathBuf, ExecutorError> {

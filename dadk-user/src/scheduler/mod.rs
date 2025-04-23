@@ -572,7 +572,8 @@ impl Scheduler {
                 let name_version = (dependency.name.clone(), dependency.version.clone());
                 if self
                     .target
-                    .get_by_name_version(&name_version.0, &name_version.1).is_none()
+                    .get_by_name_version(&name_version.0, &name_version.1)
+                    .is_none()
                 {
                     return Err(SchedulerError::DependencyNotFound(
                         entity.clone(),

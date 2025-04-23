@@ -4,7 +4,7 @@ impl StdioUtils {
     /// # 将标准错误输出转换为行列表
     pub fn stderr_to_lines(stderr: &[u8]) -> Vec<String> {
         let stderr = String::from_utf8_lossy(stderr);
-        return stderr.lines().map(|s| s.to_string()).collect();
+        stderr.lines().map(|s| s.to_string()).collect()
     }
 
     /// 获取标准错误输出的最后n行, 以字符串形式返回.

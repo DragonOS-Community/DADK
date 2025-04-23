@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, VecDeque},
     env::Vars,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, RwLock},
     time::SystemTime,
@@ -314,8 +314,7 @@ impl Executor {
 
         // 拷贝构建结果到安装路径
         let build_dir: PathBuf = self.build_dir.path.clone();
-        FileUtils::copy_dir_all(&build_dir, &install_path)
-            .map_err(ExecutorError::InstallError)?;
+        FileUtils::copy_dir_all(&build_dir, &install_path).map_err(ExecutorError::InstallError)?;
         info!("Task {} installed.", self.entity.task().name_version());
 
         Ok(())
@@ -415,7 +414,7 @@ impl Executor {
         if let Some(local_path) = self.entity.task().source_path() {
             return local_path;
         }
-        return self.source_dir.as_ref().unwrap().path.clone();
+        self.source_dir.as_ref().unwrap().path.clone()
     }
 
     fn task_log(&self) -> TaskLog {
@@ -718,11 +717,11 @@ fn create_global_env_list(
 /// * `last_modified` - 最后的更新时间
 /// * `build_time` - 构建时间
 fn last_modified_time(
-    path: &PathBuf,
+    path: &Path,
     build_time: &DateTime<Utc>,
 ) -> Result<DateTime<Utc>, ExecutorError> {
     let mut queue = VecDeque::new();
-    queue.push_back(path.clone());
+    queue.push_back(path.to_path_buf());
 
     let mut last_modified = DateTime::<Utc>::from(SystemTime::UNIX_EPOCH);
 
@@ -732,28 +731,26 @@ fn last_modified_time(
             .map_err(|e| ExecutorError::InstallError(e.to_string()))?;
 
         if metadata.is_dir() {
-            for r in std::fs::read_dir(&current_path).unwrap() {
-                if let Ok(entry) = r {
-                    // 忽略编译产物目录
-                    if entry.file_name() == "target" {
-                        continue;
-                    }
+            for entry in std::fs::read_dir(&current_path).unwrap().flatten() {
+                // 忽略编译产物目录
+                if entry.file_name() == "target" {
+                    continue;
+                }
 
-                    let entry_path = entry.path();
-                    let entry_metadata = entry.metadata().unwrap();
-                    // 比较文件的修改时间和last_modified，取最大值
-                    let file_modified = DateTime::<Utc>::from(entry_metadata.modified().unwrap());
-                    last_modified = std::cmp::max(last_modified, file_modified);
+                let entry_path = entry.path();
+                let entry_metadata = entry.metadata().unwrap();
+                // 比较文件的修改时间和last_modified，取最大值
+                let file_modified = DateTime::<Utc>::from(entry_metadata.modified().unwrap());
+                last_modified = std::cmp::max(last_modified, file_modified);
 
-                    // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续搜索
-                    if last_modified > *build_time {
-                        return Ok(last_modified);
-                    }
+                // 如果其中某一个文件的修改时间在build_time之后，则直接返回，不用继续搜索
+                if last_modified > *build_time {
+                    return Ok(last_modified);
+                }
 
-                    if entry_metadata.is_dir() {
-                        // 如果是子目录，则将其加入队列
-                        queue.push_back(entry_path);
-                    }
+                if entry_metadata.is_dir() {
+                    // 如果是子目录，则将其加入队列
+                    queue.push_back(entry_path);
                 }
             }
         } else {

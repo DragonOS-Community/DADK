@@ -160,7 +160,7 @@ impl Parser {
 
         while let Some(dir) = dir_queue.pop() {
             // 扫描目录，找到所有*.dadk文件
-            
+
             let entries: ReadDir = std::fs::read_dir(&dir)?;
 
             for entry in entries {
@@ -175,7 +175,7 @@ impl Parser {
                         continue;
                     }
                     let extension: &std::ffi::OsStr = extension.unwrap();
-                    if extension.to_ascii_lowercase() != "toml" {
+                    if !extension.eq_ignore_ascii_case("toml") {
                         continue;
                     }
                     // 找到一个配置文件, 加入列表

@@ -90,7 +90,7 @@ impl<T> Lazy<T> {
     /// This will initialize the value if it has not yet been initialized.
     pub fn get(&self) -> &T {
         self.ensure();
-        return unsafe { self.get_unchecked() };
+        unsafe { self.get_unchecked() }
     }
 
     /// Returns a reference to the value if it has been initialized.
@@ -108,7 +108,7 @@ impl<T> Lazy<T> {
     /// been initialized.
     pub fn get_mut(&mut self) -> &mut T {
         self.ensure();
-        return unsafe { self.get_mut_unchecked() };
+        unsafe { self.get_mut_unchecked() }
     }
 
     #[inline(always)]
@@ -127,14 +127,14 @@ impl<T> Deref for Lazy<T> {
 
     #[inline(always)]
     fn deref(&self) -> &T {
-        return self.get();
+        self.get()
     }
 }
 
 impl<T> DerefMut for Lazy<T> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
-        return self.get_mut();
+        self.get_mut()
     }
 }
 
