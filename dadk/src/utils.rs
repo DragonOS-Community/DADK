@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 
@@ -15,7 +15,7 @@ pub(super) fn check_dir_exists(path: &PathBuf) -> Result<&PathBuf> {
 }
 
 /// 获取给定路径的绝对路径
-pub fn abs_path(path: &PathBuf) -> PathBuf {
+pub fn abs_path(path: &Path) -> PathBuf {
     if path.is_absolute() {
         path.to_path_buf()
     } else {

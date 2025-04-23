@@ -16,7 +16,6 @@ impl BuilderVersion {
         match version {
             "v2" => BuilderVersion::V2,
             "v1" | _ => BuilderVersion::V1,
-            
         }
     }
 }

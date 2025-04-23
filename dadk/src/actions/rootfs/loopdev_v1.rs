@@ -1,5 +1,10 @@
 use core::str;
-use std::{path::PathBuf, process::Command, thread::sleep, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    thread::sleep,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Result};
 use regex::Regex;
@@ -246,8 +251,8 @@ impl LoopDeviceBuilder {
         }
     }
 
-    pub fn img_path(mut self, img_path: PathBuf) -> Self {
-        self.img_path = Some(abs_path(&img_path));
+    pub fn img_path(mut self, img_path: &Path) -> Self {
+        self.img_path = Some(abs_path(img_path));
         self
     }
 

@@ -1,12 +1,16 @@
 use core::str;
-use std::{path::PathBuf, process::Command, thread::sleep, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    thread::sleep,
+    time::Duration,
+};
 
 use regex::Regex;
 
 use crate::utils::abs_path;
 
 const LOOP_DEVICE_LOSETUP_A_REGEX: &str = r"^/dev/loop(\d+)";
-
 
 pub struct LoopDevice {
     path: PathBuf,
@@ -105,8 +109,8 @@ impl LoopDeviceBuilder {
         }
     }
 
-    pub fn img_path(mut self, img_path: PathBuf) -> Self {
-        self.img_path = Some(abs_path(&img_path));
+    pub fn img_path(mut self, img_path: &Path) -> Self {
+        self.img_path = Some(abs_path(img_path));
         self
     }
 
@@ -133,7 +137,6 @@ impl LoopDeviceBuilder {
     }
 }
 
-
 fn __loop_device_path_by_disk_image_path(
     disk_img_path: &str,
     losetup_a_output: &str,
@@ -153,7 +156,7 @@ fn __loop_device_path_by_disk_image_path(
         return Ok(loop_device);
     }
     Err(LoopError::LoopDeviceNotFound)
-} 
+}
 #[derive(Debug)]
 pub enum LoopError {
     InvalidUtf8,
@@ -190,9 +193,6 @@ impl std::fmt::Display for LoopError {
 
 impl std::error::Error for LoopError {}
 
-
-
-
 fn attach_loop_by_image(img_path: &str) -> Result<String, LoopError> {
     LosetupCmd::new()
         .arg("-f")
@@ -209,12 +209,6 @@ fn attach_exists_loop_by_image(img_path: &str) -> Result<String, LoopError> {
 
     __loop_device_path_by_disk_image_path(img_path, &output)
 }
-
-
-
-
-
-
 
 struct LosetupCmd {
     inner: Command,
@@ -263,12 +257,10 @@ impl Mapper {
         let partition_name_prefix = format!("{}p", path.file_name().unwrap().to_str().unwrap());
         let device_dir = path.parent().unwrap();
 
-        for entry in device_dir.read_dir().unwrap() {
-            if let Ok(entry) = entry {
-                let entry = entry.file_name().into_string().unwrap();
-                if entry.starts_with(&partition_name_prefix) {
-                    parts.push(entry);
-                }
+        for entry in device_dir.read_dir().unwrap().flatten() {
+            let entry = entry.file_name().into_string().unwrap();
+            if entry.starts_with(&partition_name_prefix) {
+                parts.push(entry);
             }
         }
 
@@ -285,12 +277,10 @@ impl Mapper {
         // check if mapper is created, found if {device_dir}/mapper/loopX
         let mapper_path = device_dir.join("mapper");
 
-        for entry in mapper_path.read_dir().unwrap() {
-            if let Ok(entry) = entry {
-                let entry = entry.file_name().into_string().unwrap();
-                if entry.starts_with(&partition_name_prefix) {
-                    parts.push(entry);
-                }
+        for entry in mapper_path.read_dir().unwrap().flatten() {
+            let entry = entry.file_name().into_string().unwrap();
+            if entry.starts_with(&partition_name_prefix) {
+                parts.push(entry);
             }
         }
 
@@ -308,12 +298,10 @@ impl Mapper {
             .arg("-a")
             .arg(path.to_str().unwrap())
             .output()?;
-        for entry in mapper_path.read_dir().unwrap() {
-            if let Ok(entry) = entry {
-                let entry = entry.file_name().into_string().unwrap();
-                if entry.starts_with(&partition_name_prefix) {
-                    parts.push(entry);
-                }
+        for entry in mapper_path.read_dir().unwrap().flatten() {
+            let entry = entry.file_name().into_string().unwrap();
+            if entry.starts_with(&partition_name_prefix) {
+                parts.push(entry);
             }
         }
 

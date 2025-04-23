@@ -109,7 +109,9 @@ impl Sample {
                     .unwrap(),
             );
 
-            if let std::collections::btree_map::Entry::Vacant(e) = self.data.entry(self.current_cpu.unwrap()) {
+            if let std::collections::btree_map::Entry::Vacant(e) =
+                self.data.entry(self.current_cpu.unwrap())
+            {
                 e.insert(Vec::new());
             } else {
                 log::error!(

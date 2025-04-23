@@ -5,9 +5,7 @@ pub mod rootfs;
 pub mod user;
 
 pub fn run(ctx: DADKExecContext) {
-
     match &ctx.command.action {
-        
         crate::console::Action::Kernel => {
             unimplemented!("kernel command has not implemented for run yet.")
         }
