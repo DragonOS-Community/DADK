@@ -48,7 +48,14 @@ impl LoopDevice {
             return Err(LoopError::LoopDeviceNotFound);
         }
 
-        let mapper = Mapper::new(path.clone(), detach_on_drop)?;
+        let mapper = Mapper::new(path.clone(), detach_on_drop).map_err(|err| {
+            log::error!("No loop mapper is available: {}", err);
+            let _ = LosetupCmd::new()
+                .arg("-d")
+                .arg(path.to_str().unwrap())
+                .output();
+            err
+        })?;
 
         Ok(Self {
             path,
@@ -64,16 +71,6 @@ impl LoopDevice {
     pub fn partition_path(&self, nth: u8) -> Result<PathBuf, LoopError> {
         self.mapper.partition_path(nth)
     }
-
-    // #[allow(dead_code)]
-    // pub fn detach_on_drop(&self) -> bool {
-    //     self.detach_on_drop
-    // }
-
-    // #[allow(dead_code)]
-    // pub fn set_detach_on_drop(&mut self, detach_on_drop: bool) {
-    //     self.detach_on_drop = detach_on_drop;
-    // }
 }
 impl Drop for LoopDevice {
     fn drop(&mut self) {
@@ -96,7 +93,6 @@ impl Drop for LoopDevice {
 
 pub struct LoopDeviceBuilder {
     img_path: Option<PathBuf>,
-    // loop_device_path: Option<String>,
     detach_on_drop: bool,
 }
 
@@ -104,7 +100,6 @@ impl LoopDeviceBuilder {
     pub fn new() -> Self {
         LoopDeviceBuilder {
             img_path: None,
-            // loop_device_path: None,
             detach_on_drop: true,
         }
     }

@@ -296,10 +296,11 @@ fn mount_partitioned_image_v1(
     let mut loop_device = ManuallyDrop::new(
         LoopDeviceBuilderV1::new()
             .img_path(disk_image_path)
-            .detach_on_drop(false)
             .build()
             .map_err(|e| anyhow!("Failed to create loop device: {}", e))?,
     );
+
+    loop_device.set_try_detach_when_drop(false);
 
     loop_device
         .attach()
@@ -450,9 +451,9 @@ fn create_partitioned_image_v2(ctx: &DADKExecContext, disk_image_path: &Path) ->
 pub fn show_loop_device_v1(ctx: &DADKExecContext) -> Result<()> {
     let disk_image_path = ctx.disk_image_path();
     let mut loop_device = LoopDeviceBuilderV1::new()
-        .detach_on_drop(false)
         .img_path(&disk_image_path)
         .build()?;
+    loop_device.set_try_detach_when_drop(false);
     if let Err(e) = loop_device.attach_by_exists() {
         log::error!("Failed to attach loop device: {}", e);
     } else {
