@@ -16,11 +16,9 @@ pub fn set_builder_version(ctx: &DADKExecContext) {
     BUILDER_VERSION
         .set(version)
         .expect("Failed to set builder version");
-    log::info!("Current builder version: {:?}", get_builder_version());
 }
-pub fn get_builder_version() -> BuilderVersion {
-    log::info!("Current builder version: {:?}", BUILDER_VERSION.get());
 
+pub fn get_builder_version() -> BuilderVersion {
     BUILDER_VERSION.get().cloned().unwrap_or(BuilderVersion::V1)
 }
 
