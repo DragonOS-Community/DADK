@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{cell::OnceCell, path::PathBuf};
 
 use anyhow::Result;
@@ -8,11 +9,12 @@ use dadk_config::{
 use derive_builder::Builder;
 use manifest::parse_manifest;
 
+use crate::actions::rootfs::disk_img::get_builder_version;
+use crate::actions::rootfs::BuilderVersion;
 use crate::{
     console::CommandLineArgs,
     utils::{abs_path, check_dir_exists},
 };
-
 mod manifest;
 
 /// DADK的执行上下文
@@ -43,12 +45,12 @@ pub fn build_exec_context() -> Result<DADKExecContext> {
 impl DADKExecContext {
     /// 获取工作目录的绝对路径
     pub fn workdir(&self) -> PathBuf {
-        abs_path(&PathBuf::from(&self.command.workdir))
+        abs_path(Path::new(&self.command.workdir))
     }
 
     /// 设置进程的工作目录
     fn setup_workdir(&self) -> Result<()> {
-        std::env::set_current_dir(&self.workdir()).expect("Failed to set current directory");
+        std::env::set_current_dir(self.workdir()).expect("Failed to set current directory");
         Ok(())
     }
     /// Get rootfs configuration
@@ -68,7 +70,7 @@ impl DADKExecContext {
     /// If the directory does not exist, or the path is not a folder, an error is returned
     pub fn sysroot_dir(&self) -> Result<PathBuf> {
         check_dir_exists(&self.manifest().metadata.sysroot_dir)
-            .map(|p| p.clone())
+            .cloned()
             .map_err(|e| anyhow::anyhow!("Failed to get sysroot dir: {}", e))
     }
 
@@ -77,14 +79,14 @@ impl DADKExecContext {
     /// If the directory does not exist, or the path is not a folder, an error is returned
     pub fn cache_root_dir(&self) -> Result<PathBuf> {
         check_dir_exists(&self.manifest().metadata.cache_root_dir)
-            .map(|p| p.clone())
+            .cloned()
             .map_err(|e| anyhow::anyhow!("Failed to get cache root dir: {}", e))
     }
 
     #[deprecated]
     pub fn user_config_dir(&self) -> Result<PathBuf> {
         check_dir_exists(&self.manifest().metadata.user_config_dir)
-            .map(|p| p.clone())
+            .cloned()
             .map_err(|e| anyhow::anyhow!("Failed to get user config dir: {}", e))
     }
 
@@ -92,19 +94,43 @@ impl DADKExecContext {
         self.manifest().metadata.arch
     }
 
-    /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成
     pub fn disk_image_path(&self) -> PathBuf {
+        match get_builder_version() {
+            BuilderVersion::V1 => self.disk_image_path_v1(),
+            BuilderVersion::V2 => self.disk_image_path_v2(),
+        }
+    }
+    /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成
+    pub fn disk_image_path_v2(&self) -> PathBuf {
         self.workdir()
-            .join(format!("bin/{}.img", self.disk_image_basename()))
+            .join(format!("bin/{}/disk.img", self.target_arch())) //这个是新版本路径
     }
 
     /// 获取磁盘挂载路径
-    pub fn disk_mount_path(&self) -> PathBuf {
+    pub fn disk_image_path_v1(&self) -> PathBuf {
         self.workdir()
-            .join(format!("bin/mnt/{}", self.disk_image_basename()))
+            .join(format!("bin/{}.img", self.disk_image_basename_v1())) //这个是旧版本路径
     }
 
-    fn disk_image_basename(&self) -> String {
+    pub fn disk_mount_path(&self) -> PathBuf {
+        match get_builder_version() {
+            BuilderVersion::V1 => self.disk_mount_path_v1(),
+            BuilderVersion::V2 => self.disk_mount_path_v2(),
+        }
+    }
+
+    pub fn disk_mount_path_v2(&self) -> PathBuf {
+        self.workdir()
+            .join(format!("bin/{}/mnt", self.target_arch()))
+    }
+
+    /// 获取磁盘挂载路径
+    pub fn disk_mount_path_v1(&self) -> PathBuf {
+        self.workdir()
+            .join(format!("bin/mnt/{}", self.disk_image_basename_v1()))
+    }
+
+    fn disk_image_basename_v1(&self) -> String {
         let arch: String = self.target_arch().into();
         format!("disk-image-{}", arch)
     }

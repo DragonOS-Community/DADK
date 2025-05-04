@@ -3,7 +3,10 @@ pub mod partition;
 
 mod utils;
 
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use fstype::FsType;
@@ -20,7 +23,7 @@ pub struct RootFSConfigFile {
 
 impl RootFSConfigFile {
     pub const LBA_SIZE: usize = 512;
-    pub fn load(path: &PathBuf) -> Result<Self> {
+    pub fn load(path: &Path) -> Result<Self> {
         // 读取文件内容
         let content = fs::read_to_string(path)?;
         Self::load_from_str(&content)

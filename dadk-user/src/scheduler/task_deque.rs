@@ -56,7 +56,7 @@ impl TaskDeque {
             self.queue.push(handler);
             return true;
         }
-        return false;
+        false
     }
 
     /// 将清理DADK任务添加到任务队列中
@@ -80,11 +80,11 @@ impl TaskDeque {
     }
 
     pub fn queue(&self) -> &Vec<JoinHandle<()>> {
-        return &self.queue;
+        &self.queue
     }
 
     pub fn queue_mut(&mut self) -> &mut Vec<JoinHandle<()>> {
-        return &mut self.queue;
+        &mut self.queue
     }
 
     pub fn set_thread(&mut self, mut thread: usize) {

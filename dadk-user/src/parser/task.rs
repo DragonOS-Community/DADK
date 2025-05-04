@@ -95,7 +95,7 @@ impl DADKTask {
     /// 从环境变量`ARCH`中获取，如果没有设置，则默认为`x86_64`
     pub fn default_target_arch() -> TargetArch {
         let s = std::env::var("ARCH").unwrap_or("x86_64".to_string());
-        return TargetArch::try_from(s.as_str()).unwrap();
+        TargetArch::try_from(s.as_str()).unwrap()
     }
 
     fn default_target_arch_vec() -> Vec<TargetArch> {
@@ -118,7 +118,7 @@ impl DADKTask {
         self.validate_envs()?;
         self.validate_target_arch()?;
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn trim(&mut self) {
@@ -137,7 +137,7 @@ impl DADKTask {
         for depend in &self.depends {
             depend.validate()?;
         }
-        return Ok(());
+        Ok(())
     }
 
     fn trim_depends(&mut self) {
@@ -152,14 +152,14 @@ impl DADKTask {
                 env.validate()?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     fn validate_target_arch(&self) -> Result<()> {
         if self.target_arch.is_empty() {
             return Err(anyhow::Error::msg("target_arch is empty"));
         }
-        return Ok(());
+        Ok(())
     }
 
     fn trim_envs(&mut self) {
@@ -186,7 +186,7 @@ impl DADKTask {
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn name_version(&self) -> String {
@@ -194,11 +194,11 @@ impl DADKTask {
         for (src, dst) in &NAME_VERSION_REPLACE_TABLE {
             name_version = name_version.replace(src, dst);
         }
-        return name_version;
+        name_version
     }
 
     pub fn name_version_env(&self) -> String {
-        return Self::name_version_uppercase(&self.name, &self.version);
+        Self::name_version_uppercase(&self.name, &self.version)
     }
 
     pub fn name_version_uppercase(name: &str, version: &str) -> String {
@@ -206,7 +206,7 @@ impl DADKTask {
         for (src, dst) in &NAME_VERSION_REPLACE_TABLE {
             name_version = name_version.replace(src, dst);
         }
-        return name_version;
+        name_version
     }
 
     /// # 获取源码目录
@@ -215,20 +215,12 @@ impl DADKTask {
     pub fn source_path(&self) -> Option<PathBuf> {
         match &self.task_type {
             TaskType::BuildFromSource(cs) => match cs {
-                CodeSource::Local(lc) => {
-                    return Some(lc.path().clone());
-                }
-                _ => {
-                    return None;
-                }
+                CodeSource::Local(lc) => Some(lc.path().clone()),
+                _ => None,
             },
             TaskType::InstallFromPrebuilt(ps) => match ps {
-                PrebuiltSource::Local(lc) => {
-                    return Some(lc.path().clone());
-                }
-                _ => {
-                    return None;
-                }
+                PrebuiltSource::Local(lc) => Some(lc.path().clone()),
+                _ => None,
             },
         }
     }

@@ -27,9 +27,9 @@ pub enum UserCleanLevel {
     Output,
 }
 
-impl Into<dadk_config::user::UserCleanLevel> for UserCleanLevel {
-    fn into(self) -> dadk_config::user::UserCleanLevel {
-        match self {
+impl From<UserCleanLevel> for dadk_config::user::UserCleanLevel {
+    fn from(val: UserCleanLevel) -> Self {
+        match val {
             UserCleanLevel::All => dadk_config::user::UserCleanLevel::All,
             UserCleanLevel::InSrc => dadk_config::user::UserCleanLevel::InSrc,
             UserCleanLevel::Output => dadk_config::user::UserCleanLevel::Output,
@@ -37,9 +37,9 @@ impl Into<dadk_config::user::UserCleanLevel> for UserCleanLevel {
     }
 }
 
-impl Into<dadk_user::context::Action> for UserCommand {
-    fn into(self) -> dadk_user::context::Action {
-        match self {
+impl From<UserCommand> for dadk_user::context::Action {
+    fn from(val: UserCommand) -> Self {
+        match val {
             UserCommand::Build => dadk_user::context::Action::Build,
             UserCommand::Install => dadk_user::context::Action::Install,
             UserCommand::Clean(args) => dadk_user::context::Action::Clean(args.level.into()),

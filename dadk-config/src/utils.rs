@@ -90,12 +90,10 @@ pub fn apply_kv_array(
 
             key_strings.insert(key, arg.to_owned());
             continue;
+        } else if single_value_keys.contains(&arg.as_str()) || multi_value_keys.contains(arg) {
+            return Err(anyhow!("Invalid argument: {}", arg));
         } else {
-            if single_value_keys.contains(&arg.as_str()) || multi_value_keys.contains(arg) {
-                return Err(anyhow!("Invalid argument: {}", arg));
-            } else {
-                key_strings.insert(arg.to_owned(), arg.to_owned());
-            }
+            key_strings.insert(arg.to_owned(), arg.to_owned());
         }
     }
 

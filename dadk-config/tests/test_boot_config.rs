@@ -11,8 +11,8 @@ const BOOT_CONFIG_FILE_NAME: &str = "config/boot.toml";
 #[test]
 fn test_load_boot_config_template(ctx: &DadkConfigTestContext) {
     let boot_config_path = ctx.templates_dir().join(BOOT_CONFIG_FILE_NAME);
-    assert_eq!(boot_config_path.exists(), true);
-    assert_eq!(boot_config_path.is_file(), true);
+    assert!(boot_config_path.exists());
+    assert!(boot_config_path.is_file());
     let _manifest = BootConfigFile::load(&boot_config_path).expect("Failed to load boot config");
     // TODO 校验 manifest 中的字段是否齐全
 }

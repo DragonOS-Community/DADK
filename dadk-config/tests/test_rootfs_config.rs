@@ -14,8 +14,8 @@ const ROOTFS_CONFIG_FILE_NAME: &str = "config/rootfs.toml";
 #[test]
 fn test_load_rootfs_manifest_template(ctx: &DadkConfigTestContext) {
     let rootfs_manifest_path = ctx.templates_dir().join(ROOTFS_CONFIG_FILE_NAME);
-    assert_eq!(rootfs_manifest_path.exists(), true);
-    assert_eq!(rootfs_manifest_path.is_file(), true);
+    assert!(rootfs_manifest_path.exists());
+    assert!(rootfs_manifest_path.is_file());
     let manifest =
         RootFSConfigFile::load(&rootfs_manifest_path).expect("Failed to load rootfs manifest");
     assert_eq!(manifest.partition.partition_type, PartitionType::None);

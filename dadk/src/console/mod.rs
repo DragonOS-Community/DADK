@@ -51,6 +51,6 @@ impl Action {
         if matches!(self, Action::Profile(_)) {
             return false;
         }
-        return true;
+        true
     }
 }
