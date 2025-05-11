@@ -495,13 +495,18 @@ impl LocalSource {
 pub struct ArchiveSource {
     /// 压缩包的URL
     url: String,
+    /// 把压缩包中的哪个目录作为根目录（可选）
+    /// 默认是压缩包内的根目录
+    #[serde(default)]
+    rootdir: Option<String>,
 }
 
 impl ArchiveSource {
     #[allow(dead_code)]
-    pub fn new(url: String) -> Self {
-        Self { url }
+    pub fn new(url: String, rootdir: Option<String>) -> Self {
+        Self { url, rootdir }
     }
+
     pub fn validate(&self) -> Result<()> {
         if self.url.is_empty() {
             return Err(Error::msg("url is empty"));
@@ -517,6 +522,13 @@ impl ArchiveSource {
             }
         } else {
             return Err(Error::msg(format!("url {:?} is not a valid url", self.url)));
+        }
+
+        if self.rootdir.is_some() && self.rootdir.as_ref().unwrap().starts_with('/') {
+            return Err(Error::msg(format!(
+                "archive rootdir {:?} starts with '/'",
+                self.rootdir
+            )));
         }
         return Ok(());
     }
@@ -557,20 +569,22 @@ impl ArchiveSource {
         }
         //创建临时目录
         std::fs::create_dir(path).map_err(|e| e.to_string())?;
-        info!("downloading {:?}", archive_name);
+        info!("downloading {:?}, url: {:?}", archive_name, self.url);
         FileUtils::download_file(&self.url, path).map_err(|e| e.to_string())?;
         //下载成功，开始尝试解压
         info!("download {:?} finished, start unzip", archive_name);
         let archive_file = ArchiveFile::new(&path.join(archive_name));
-        archive_file.unzip()?;
+        archive_file.unzip(self.rootdir.as_ref())?;
         //删除创建的临时文件夹
-        std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+        // std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
         return Ok(());
     }
 }
 
 pub struct ArchiveFile {
+    /// archive file所在目录
     archive_path: PathBuf,
+    /// 压缩文件名
     archive_name: String,
     archive_type: ArchiveType,
 }
@@ -600,6 +614,89 @@ impl ArchiveFile {
         }
     }
 
+    fn do_unzip_tar_file(&self, in_archive_rootdir: Option<&String>) -> Result<(), String> {
+        let mut cmd = Command::new("tar");
+        cmd.arg("-xf").arg(&self.archive_name);
+
+        // 处理in_archive_rootdir参数，只解压压缩文件内的指定目录
+        if let Some(in_archive_rootdir) = in_archive_rootdir {
+            let mut components = 0;
+            in_archive_rootdir.split('/').for_each(|x| {
+                if x != "" {
+                    components += 1;
+                }
+            });
+
+            cmd.arg(format!("--strip-components={}", components));
+            cmd.arg(&in_archive_rootdir);
+        }
+
+        cmd.current_dir(&self.archive_path);
+
+        log::debug!("unzip tar file: {:?}", cmd);
+
+        let proc: std::process::Child = cmd
+            .stderr(Stdio::piped())
+            .stdout(Stdio::inherit())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let output = proc.wait_with_output().map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(format!(
+                "unzip tar file failed, status: {:?},  stderr: {:?}",
+                output.status,
+                StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
+            ));
+        }
+        Ok(())
+    }
+
+    fn do_unzip_zip_file(&self, in_archive_rootdir: Option<&String>) -> Result<(), String> {
+        let file =
+            File::open(&self.archive_path.join(&self.archive_name)).map_err(|e| e.to_string())?;
+        let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let file_name = file.name();
+
+            // 处理in_archive_rootdir参数，只解压指定目录下的内容
+            let outpath = if let Some(rootdir) = in_archive_rootdir {
+                if !file_name.starts_with(rootdir) {
+                    continue;
+                }
+                // 去除rootdir前缀，保留剩余路径
+                let relative_path = file_name.strip_prefix(rootdir).unwrap();
+                let relative_path = relative_path.trim_start_matches("/");
+                self.archive_path.join(relative_path)
+            } else {
+                match file.enclosed_name() {
+                    Some(path) => self.archive_path.join(path),
+                    None => continue,
+                }
+            };
+            if (*file.name()).ends_with('/') {
+                std::fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
+            } else {
+                if let Some(p) = outpath.parent() {
+                    if !p.exists() {
+                        std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+                    }
+                }
+                let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
+                std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+            }
+            //设置解压后权限，在Linux中Unzip会丢失权限
+            #[cfg(unix)]
+            {
+                if let Some(mode) = file.unix_mode() {
+                    std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// @brief 对self.archive_path路径下名为self.archive_name的压缩文件(tar.gz或zip)进行解压缩
     ///
     /// 在此函数中进行路径和文件名有效性的判断，如果有效的话就开始解压缩，根据ArchiveType枚举类型来
@@ -608,8 +705,7 @@ impl ArchiveFile {
     ///
     ///
     /// @return 根据结果返回OK或Err
-
-    pub fn unzip(&self) -> Result<(), String> {
+    pub fn unzip(&self, in_archive_rootdir: Option<&String>) -> Result<(), String> {
         let path = &self.archive_path;
         if !path.is_dir() {
             return Err(format!("Archive directory {:?} is wrong", path));
@@ -623,57 +719,11 @@ impl ArchiveFile {
         //根据压缩文件的类型生成cmd指令
         match &self.archive_type {
             ArchiveType::TarGz | ArchiveType::TarXz => {
-                let mut cmd = Command::new("tar");
-                cmd.arg("-xf").arg(&self.archive_name);
-                let proc: std::process::Child = cmd
-                    .current_dir(path)
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::inherit())
-                    .spawn()
-                    .map_err(|e| e.to_string())?;
-                let output = proc.wait_with_output().map_err(|e| e.to_string())?;
-                if !output.status.success() {
-                    return Err(format!(
-                        "unzip failed, status: {:?},  stderr: {:?}",
-                        output.status,
-                        StdioUtils::tail_n_str(StdioUtils::stderr_to_lines(&output.stderr), 5)
-                    ));
-                }
+                self.do_unzip_tar_file(in_archive_rootdir)?;
             }
 
             ArchiveType::Zip => {
-                let file = File::open(&self.archive_path.join(&self.archive_name))
-                    .map_err(|e| e.to_string())?;
-                let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
-                for i in 0..archive.len() {
-                    let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-                    let outpath = match file.enclosed_name() {
-                        Some(path) => self.archive_path.join(path),
-                        None => continue,
-                    };
-                    if (*file.name()).ends_with('/') {
-                        std::fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
-                    } else {
-                        if let Some(p) = outpath.parent() {
-                            if !p.exists() {
-                                std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
-                            }
-                        }
-                        let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
-                        std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
-                    }
-                    //设置解压后权限，在Linux中Unzip会丢失权限
-                    #[cfg(unix)]
-                    {
-                        if let Some(mode) = file.unix_mode() {
-                            std::fs::set_permissions(
-                                &outpath,
-                                std::fs::Permissions::from_mode(mode),
-                            )
-                            .map_err(|e| e.to_string())?;
-                        }
-                    }
-                }
+                self.do_unzip_zip_file(in_archive_rootdir)?;
             }
             _ => {
                 return Err("unsupported archive type".to_string());
@@ -683,14 +733,23 @@ impl ArchiveFile {
         info!("unzip successfully, removing archive ");
         std::fs::remove_file(path.join(&self.archive_name)).map_err(|e| e.to_string())?;
         //从解压的文件夹中提取出文件并删除下载的压缩包等价于指令"cd *;mv ./* ../../"
-        for entry in path.read_dir().map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-            FileUtils::move_files(&path, &self.archive_path.parent().unwrap())
-                .map_err(|e| e.to_string())?;
-            //删除空的单独文件夹
-            std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
-        }
+        // for entry in path.read_dir().map_err(|e| e.to_string())? {
+        //     let entry = entry.map_err(|e| e.to_string())?;
+        //     let path = entry.path();
+        //     FileUtils::move_files(&path, &self.archive_path.parent().unwrap())
+        //         .map_err(|e| e.to_string())?;
+        //     //删除空的单独文件夹
+        //     std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+        // }
+        std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!(
+                "mv {p}/* {parent} && rm -rf {p}",
+                p = &self.archive_path.to_string_lossy(),
+                parent = self.archive_path.parent().unwrap().to_string_lossy()
+            ))
+            .output()
+            .map_err(|e| e.to_string())?;
         return Ok(());
     }
 }

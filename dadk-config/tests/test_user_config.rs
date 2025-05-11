@@ -39,6 +39,7 @@ fn test_parse_dadk_user_config(ctx: &mut DadkConfigTestContext) {
             source_path: "https://git.mirrors.dragonos.org.cn/DragonOS-Community/test_git.git"
                 .to_string(),
             branch: None,
+            archive_rootdir: None,
             revision: Some("01cdc56863".to_string()),
         },
         depends: vec![

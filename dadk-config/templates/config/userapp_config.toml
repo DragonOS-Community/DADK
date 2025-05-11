@@ -32,6 +32,9 @@ source = "git"
 # 路径或URL
 source-path = "https://git.mirrors.dragonos.org.cn/DragonOS-Community/test_git.git"
 
+# 把压缩包中的哪个目录作为根目录（可选）,仅当 source = "archive" 时生效
+# archive-rootdir = ""
+
 # git标签或分支
 # 注意： branch和revision只能二选一，且source要设置为"git"
 revision = "01cdc56863"

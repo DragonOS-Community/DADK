@@ -138,6 +138,9 @@ source = "local"
 # 路径或URL
 source-path = "user/apps/helloworld"
 
+# 把压缩包中的哪个目录作为根目录（可选）,仅当 source = "archive" 时生效
+# archive-rootdir = ""
+
 # 构建相关信息
 [build]
 # （可选）构建命令

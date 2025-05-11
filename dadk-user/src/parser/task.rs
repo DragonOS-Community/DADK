@@ -294,7 +294,7 @@ impl TryFrom<TaskSource> for TaskType {
                     LocalSource::new(PathBuf::from(task_source.source_path)),
                 ))),
                 Source::Archive => Ok(TaskType::BuildFromSource(CodeSource::Archive(
-                    ArchiveSource::new(task_source.source_path),
+                    ArchiveSource::new(task_source.source_path, task_source.archive_rootdir),
                 ))),
             },
             TaskSourceType::InstallFromPrebuilt => match task_source.source {
@@ -305,7 +305,7 @@ impl TryFrom<TaskSource> for TaskType {
                     LocalSource::new(PathBuf::from(task_source.source_path)),
                 ))),
                 Source::Archive => Ok(TaskType::InstallFromPrebuilt(PrebuiltSource::Archive(
-                    ArchiveSource::new(task_source.source_path),
+                    ArchiveSource::new(task_source.source_path, task_source.archive_rootdir),
                 ))),
             },
         }
