@@ -10,6 +10,7 @@ use std::{
     thread::ThreadId,
 };
 
+use chrono::{DateTime, Utc};
 use log::{error, info};
 
 use crate::{
@@ -69,6 +70,11 @@ impl SchedEntity {
     #[allow(dead_code)]
     pub fn task(&self) -> DADKTask {
         self.inner.lock().unwrap().task.clone()
+    }
+
+    pub fn config_file_timestamp(&self) -> Option<DateTime<Utc>> {
+        let meta = self.file_path().metadata().ok()?;
+        meta.modified().map(|t| DateTime::<Utc>::from(t)).ok()
     }
 
     /// 入度加1

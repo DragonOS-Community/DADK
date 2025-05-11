@@ -28,22 +28,6 @@ impl FileUtils {
         Ok(())
     }
 
-    /// 把指定路径下所有文件和文件夹递归地移动到另一个文件中
-    pub fn move_files(src: &Path, dst: &Path) -> std::io::Result<()> {
-        for entry in src.read_dir()? {
-            let entry = entry?;
-            let path = entry.path();
-            let new_path = dst.join(path.file_name().unwrap());
-            if entry.file_type()?.is_dir() {
-                std::fs::create_dir_all(&new_path)?;
-                FileUtils::move_files(&path, &new_path)?;
-            } else {
-                std::fs::rename(&path, &new_path)?;
-            }
-        }
-        Ok(())
-    }
-
     /// 递归地复制给定目录下所有文件到另一个文件夹中
     pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
         log::trace!("FileUtils::copy_dir_all: src: {:?}, dst: {:?}", src, dst);

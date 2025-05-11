@@ -20,6 +20,8 @@ pub struct TaskLog {
     build_status: Option<BuildStatus>,
     /// 任务安装状态
     install_status: Option<InstallStatus>,
+    /// dadk配置文件的时间戳
+    dadk_config_timestamp: Option<DateTime<Utc>>,
 }
 
 fn ok_or_default<'a, T, D>(deserializer: D) -> Result<T, D::Error>
@@ -39,7 +41,16 @@ impl TaskLog {
             build_status: None,
             install_timestamp: None,
             install_status: None,
+            dadk_config_timestamp: None,
         }
+    }
+
+    pub fn dadk_config_timestamp(&self) -> Option<&DateTime<Utc>> {
+        self.dadk_config_timestamp.as_ref()
+    }
+
+    pub fn set_dadk_config_timestamp(&mut self, time: DateTime<Utc>) {
+        self.dadk_config_timestamp = Some(time);
     }
 
     #[allow(dead_code)]

@@ -9,6 +9,11 @@ pub struct TaskSource {
     pub source: Source,
     #[serde(rename = "source-path")]
     pub source_path: String,
+    /// 把压缩包中的哪个目录作为根目录（可选）
+    ///
+    /// 仅当 source = "archive" 时生效
+    #[serde(rename = "archive-rootdir")]
+    pub archive_rootdir: Option<String>,
     /// 分支（可选，如果为空，则拉取master）branch和revision只能同时指定一个
     pub branch: Option<String>,
     /// 特定的提交的hash值（可选，如果为空，则拉取branch的最新提交）

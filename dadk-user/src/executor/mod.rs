@@ -139,6 +139,11 @@ impl Executor {
             }
         }
 
+        // 设置dadk配置文件的时间戳
+        if let Some(ts) = self.entity.config_file_timestamp() {
+            task_log.set_dadk_config_timestamp(ts);
+        }
+
         self.task_data_dir
             .save_task_log(&task_log)
             .expect("Failed to save task log");
@@ -196,25 +201,52 @@ impl Executor {
         Ok(())
     }
 
-    fn build(&mut self) -> Result<(), ExecutorError> {
-        if let Some(status) = self.task_log().build_status() {
-            if let Some(build_time) = self.task_log().build_time() {
-                let mut last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
-                last_modified = core::cmp::max(
-                    last_modified,
-                    last_modified_time(&self.src_work_dir(), build_time)?,
-                );
+    fn needs_build(&self) -> Result<bool, ExecutorError> {
+        // dadk配置文件更新了，需要重新构建
+        if self.config_file_updated() {
+            return Ok(true);
+        }
+        let task_log = self.task_log();
+        let build_status = task_log.build_status();
+        if build_status.is_none() {
+            return Ok(true);
+        }
 
-                if *status == BuildStatus::Success
-                    && (self.entity.task().build_once || last_modified < *build_time)
-                {
-                    info!(
-                        "Task {} has been built successfully, skip build.",
-                        self.entity.task().name_version()
-                    );
-                    return Ok(());
-                }
-            }
+        let build_time = task_log.build_time();
+        if build_time.is_none() {
+            return Ok(true);
+        }
+
+        let build_status = build_status.unwrap();
+        let build_time = build_time.unwrap();
+
+        let mut last_modified = last_modified_time(&self.entity.file_path(), build_time)?;
+        if let Some(ref d) = self.src_work_dir() {
+            last_modified = core::cmp::max(last_modified, last_modified_time(d, build_time)?);
+        }
+
+        // 跳过构建
+        if *build_status == BuildStatus::Success
+            && (self.entity.task().build_once || last_modified < *build_time)
+        {
+            return Ok(false);
+        }
+
+        return Ok(true);
+    }
+
+    fn config_file_updated(&self) -> bool {
+        let task_log = self.task_log();
+        task_log.dadk_config_timestamp() != self.entity.config_file_timestamp().as_ref()
+    }
+
+    fn build(&mut self) -> Result<(), ExecutorError> {
+        if !self.needs_build().unwrap_or(true) {
+            log::info!(
+                "No need to build: {}, skipping...",
+                self.entity.task().name_version()
+            );
+            return Ok(());
         }
 
         return self.do_build();
@@ -259,26 +291,49 @@ impl Executor {
         return Ok(());
     }
 
+    fn needs_install(&self) -> Result<bool, ExecutorError> {
+        // dadk配置文件更新了，需要重新安装
+        if self.config_file_updated() {
+            return Ok(true);
+        }
+        let task_log = self.task_log();
+        let install_status = task_log.install_status();
+        if install_status.is_none() {
+            return Ok(true);
+        }
+
+        let install_time = task_log.install_time();
+        if install_time.is_none() {
+            return Ok(true);
+        }
+
+        let install_status = install_status.unwrap();
+        let install_time = install_time.unwrap();
+
+        let last_modified = last_modified_time(&self.build_dir.path, install_time)?;
+        let last_modified = core::cmp::max(
+            last_modified,
+            last_modified_time(&self.entity.file_path(), install_time)?,
+        );
+
+        // 跳过构建
+        if *install_status == InstallStatus::Success
+            && (self.entity.task().install_once || last_modified < *install_time)
+        {
+            return Ok(false);
+        }
+
+        return Ok(true);
+    }
+
     fn install(&self) -> Result<(), ExecutorError> {
         log::trace!("dadk-user: install {}", self.entity.task().name_version());
-        if let Some(status) = self.task_log().install_status() {
-            if let Some(install_time) = self.task_log().install_time() {
-                let last_modified = last_modified_time(&self.build_dir.path, install_time)?;
-                let last_modified = core::cmp::max(
-                    last_modified,
-                    last_modified_time(&self.entity.file_path(), install_time)?,
-                );
-
-                if *status == InstallStatus::Success
-                    && (self.entity.task().install_once || last_modified < *install_time)
-                {
-                    info!(
-                        "install: Task {} not changed.",
-                        self.entity.task().name_version()
-                    );
-                    return Ok(());
-                }
-            }
+        if !self.needs_install().unwrap_or(false) {
+            info!(
+                "install: Task {} not changed.",
+                self.entity.task().name_version()
+            );
+            return Ok(());
         }
         log::trace!(
             "dadk-user: to do install {}",
@@ -405,17 +460,17 @@ impl Executor {
         info!(
             "{}: Cleaning cache directory: {}",
             self.entity.task().name_version(),
-            self.src_work_dir().display()
+            cache_dir.as_ref().unwrap().path.display()
         );
         return cache_dir.unwrap().remove_self_recursive();
     }
 
     /// 获取源文件的工作目录
-    fn src_work_dir(&self) -> PathBuf {
+    fn src_work_dir(&self) -> Option<PathBuf> {
         if let Some(local_path) = self.entity.task().source_path() {
-            return local_path;
+            return Some(local_path);
         }
-        return self.source_dir.as_ref().unwrap().path.clone();
+        return Some(self.source_dir.as_ref()?.path.clone());
     }
 
     fn task_log(&self) -> TaskLog {
@@ -452,7 +507,7 @@ impl Executor {
         let raw_cmd = raw_cmd.unwrap();
 
         let mut command = Command::new("bash");
-        command.current_dir(self.src_work_dir());
+        command.current_dir(self.src_work_dir().unwrap());
 
         // 设置参数
         command.arg("-c");
