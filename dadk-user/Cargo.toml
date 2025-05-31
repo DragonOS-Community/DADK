@@ -7,7 +7,7 @@ license = "GPL-2.0-only"
 
 [dependencies]
 anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
-chrono = { version = "=0.4.35", features = ["serde"] }
+chrono = { version = "=0.4.39", features = ["serde"] }
 clap = { version = "=4.5.20", features = ["derive"] }
 dadk-config = { version = "0.4.0", path = "../dadk-config" }
 derive_builder = "0.20.0"
