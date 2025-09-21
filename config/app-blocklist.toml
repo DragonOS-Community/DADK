@@ -1,0 +1,10 @@
+blocked_apps = [
+    "busybox",
+    "nginx",
+    "test-*",
+    "deprecated-utils"
+]
+
+reason = "These applications are not needed for current build"
+strict = true
+log_skipped = true

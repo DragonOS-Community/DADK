@@ -86,6 +86,13 @@ pub struct Metadata {
     #[deprecated(note = "This field is deprecated and will be removed in DADK 1.0")]
     #[serde(default = "default_user_config_dir", rename = "user-config-dir")]
     pub user_config_dir: PathBuf,
+
+    /// Application blocklist configuration file path
+    #[serde(
+        default = "default_app_blocklist_config_path",
+        rename = "app-blocklist-config"
+    )]
+    pub app_blocklist_config: PathBuf,
 }
 
 /// Returns the default path for the rootfs configuration file.
@@ -123,6 +130,12 @@ fn default_user_config_dir() -> PathBuf {
     "user/dadk/config".into()
 }
 
+/// Returns the default path for the application blocklist configuration file.
+fn default_app_blocklist_config_path() -> PathBuf {
+    set_used_default();
+    "config/app-blocklist.toml".into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +154,7 @@ mod tests {
             sysroot-dir = "bin/sysroot"
             cache-root-dir = "bin/dadk_cache"
             user-config-dir = "user/dadk/config"
+            app-blocklist-config = "config/app-blocklist.toml"
         "#;
 
         let mut temp_file = NamedTempFile::new()?;

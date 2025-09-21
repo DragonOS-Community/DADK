@@ -20,6 +20,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 shlex = "1.3.0"
 toml = "0.8.12"
+regex = "1.10"
 
 # 只有在test的情况下才会引入下列库
 [dev-dependencies]

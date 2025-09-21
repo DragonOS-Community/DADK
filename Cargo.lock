@@ -485,6 +485,7 @@ dependencies = [
  "env_logger",
  "indexmap",
  "log",
+ "regex",
  "serde",
  "serde_json",
  "shlex",

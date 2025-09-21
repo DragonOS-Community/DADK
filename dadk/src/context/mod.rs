@@ -3,9 +3,11 @@ use std::{cell::OnceCell, path::PathBuf};
 use anyhow::Result;
 use clap::Parser;
 use dadk_config::{
-    common::target_arch::TargetArch, manifest::DadkManifestFile, rootfs::RootFSConfigFile,
+    app_blocklist::AppBlocklistConfigFile, common::target_arch::TargetArch,
+    manifest::DadkManifestFile, rootfs::RootFSConfigFile,
 };
 use derive_builder::Builder;
+use log::warn;
 use manifest::parse_manifest;
 
 use crate::{
@@ -24,6 +26,10 @@ pub struct DADKExecContext {
 
     /// RootFS config file
     rootfs: OnceCell<RootFSConfigFile>,
+
+    /// Application blocklist config file
+    #[builder(setter(skip))]
+    app_blocklist: OnceCell<AppBlocklistConfigFile>,
 }
 
 pub fn build_exec_context() -> Result<DADKExecContext> {
@@ -90,6 +96,36 @@ impl DADKExecContext {
 
     pub fn target_arch(&self) -> TargetArch {
         self.manifest().metadata.arch
+    }
+
+    /// 获取应用程序黑名单配置
+    pub fn app_blocklist(&self) -> &AppBlocklistConfigFile {
+        self.app_blocklist.get_or_init(|| {
+            let manifest = self.manifest();
+            let config_path = &manifest.metadata.app_blocklist_config;
+
+            // 转换为绝对路径
+            let abs_config_path = if config_path.is_absolute() {
+                config_path.clone()
+            } else {
+                self.workdir().join(config_path)
+            };
+
+            AppBlocklistConfigFile::load(&abs_config_path).unwrap_or_else(|e| {
+                warn!(
+                    "Failed to load app blocklist config: {}, using empty config",
+                    e
+                );
+                AppBlocklistConfigFile::load_from_str(
+                    r#"
+                        blocked_apps = []
+                        strict = true
+                        log_skipped = true
+                        "#,
+                )
+                .unwrap_or_default()
+            })
+        })
     }
 
     /// 获取磁盘镜像的路径，路径由工作目录、架构和固定文件名组成

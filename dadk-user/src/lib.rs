@@ -83,7 +83,6 @@
 //! - 支持自动更新
 //! - 完善clean命令的逻辑
 
-#![feature(extract_if)]
 #![feature(io_error_more)]
 
 #[macro_use]
@@ -133,7 +132,10 @@ pub fn dadk_user_main(context: DadkUserExecuteContext) {
         context.thread_num().map_or_else(|| 0, |t| t)
     );
 
-    let mut parser = parser::Parser::new(context.config_dir().unwrap().clone());
+    let mut parser = parser::Parser::new(
+        context.config_dir().unwrap().clone(),
+        context.app_blocklist().clone(),
+    );
     let r = parser.parse();
     if r.is_err() {
         exit(1);

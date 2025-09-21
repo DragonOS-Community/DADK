@@ -13,7 +13,8 @@ use crate::{
 use super::create_global_env_list;
 
 fn setup_executor<T: TestContextExt>(config_file: PathBuf, ctx: &T) -> Executor {
-    let task = Parser::new(ctx.base_context().config_v2_dir()).parse_config_file(&config_file);
+    let task =
+        Parser::new(ctx.base_context().config_v2_dir(), None).parse_config_file(&config_file);
     assert!(task.is_ok(), "parse error: {:?}", task);
     let scheduler = Scheduler::new(
         ctx.execute_context().self_ref().unwrap(),

@@ -4,7 +4,9 @@ use std::{
     sync::{Arc, Mutex, Weak},
 };
 
-use dadk_config::{common::target_arch::TargetArch, user::UserCleanLevel};
+use dadk_config::{
+    app_blocklist::AppBlocklistConfigFile, common::target_arch::TargetArch, user::UserCleanLevel,
+};
 use derive_builder::Builder;
 use log::error;
 #[cfg(test)]
@@ -29,6 +31,9 @@ pub struct DadkUserExecuteContext {
     /// 目标架构
     #[builder(default = "crate::DADKTask::default_target_arch()")]
     target_arch: TargetArch,
+
+    /// 应用程序黑名单配置
+    app_blocklist: Option<AppBlocklistConfigFile>,
 
     #[cfg(test)]
     base_test_context: Option<BaseGlobalTestContext>,
@@ -99,6 +104,14 @@ impl DadkUserExecuteContext {
     pub fn cache_dir(&self) -> Option<&PathBuf> {
         self.cache_dir.as_ref()
     }
+
+    pub fn app_blocklist(&self) -> &Option<AppBlocklistConfigFile> {
+        &self.app_blocklist
+    }
+
+    pub fn set_app_blocklist(&mut self, blocklist: AppBlocklistConfigFile) {
+        self.app_blocklist = Some(blocklist);
+    }
 }
 
 #[cfg(test)]
@@ -145,6 +158,7 @@ impl TestContext for DadkExecuteContextTestBuildX86_64V1 {
             DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::X86_64)
                 .config_dir(Some(base_context.config_v1_dir()))
+                .app_blocklist(None)
                 .build()
                 .expect("Failed to build DadkExecuteContextTestBuildX86_64V1");
         let context = Arc::new(context);
@@ -166,6 +180,7 @@ impl TestContext for DadkExecuteContextTestBuildRiscV64V1 {
             DadkUserExecuteContextBuilder::default_test_execute_context_builder(&base_context)
                 .target_arch(TargetArch::RiscV64)
                 .config_dir(Some(base_context.config_v1_dir()))
+                .app_blocklist(None)
                 .build()
                 .expect("Failed to build DadkExecuteContextTestBuildRiscV64V1");
         let context = Arc::new(context);
