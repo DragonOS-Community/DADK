@@ -51,8 +51,8 @@ use std::{
 
 use self::task::DADKTask;
 use anyhow::Result;
-use dadk_config::user::UserConfigFile;
-use log::{debug, error, info};
+use dadk_config::{app_blocklist::AppBlocklistConfigFile, user::UserConfigFile};
+use log::{debug, error, info, warn};
 
 pub mod task;
 pub mod task_log;
@@ -66,6 +66,8 @@ pub struct Parser {
     config_dir: PathBuf,
     /// 扫描到的配置文件列表
     config_files: Vec<PathBuf>,
+    /// 黑名单配置
+    blocklist: Option<AppBlocklistConfigFile>,
 }
 
 pub struct ParserError {
@@ -123,10 +125,11 @@ pub enum InnerParserError {
 }
 
 impl Parser {
-    pub fn new(config_dir: PathBuf) -> Self {
+    pub fn new(config_dir: PathBuf, blocklist: Option<AppBlocklistConfigFile>) -> Self {
         Self {
             config_dir,
             config_files: Vec::new(),
+            blocklist,
         }
     }
 
@@ -146,8 +149,14 @@ impl Parser {
         let r: Result<Vec<(PathBuf, DADKTask)>> = self.gen_tasks();
         if r.is_err() {
             error!("Error while parsing config files: {:?}", r);
+            return r;
         }
-        return r;
+        let mut tasks = r.unwrap();
+
+        // 应用黑名单过滤
+        self.filter_blocked_apps(&mut tasks)?;
+
+        return Ok(tasks);
     }
 
     /// # 扫描配置文件目录，找到所有配置文件
@@ -234,5 +243,77 @@ impl Parser {
     pub fn parse_toml_file(config_file: &PathBuf) -> Result<DADKTask> {
         let dadk_user_config = UserConfigFile::load(config_file)?;
         DADKTask::try_from(dadk_user_config)
+    }
+
+    /// 过滤黑名单中的应用程序
+    fn filter_blocked_apps(&self, tasks: &mut Vec<(PathBuf, DADKTask)>) -> Result<()> {
+        let blocklist = match &self.blocklist {
+            Some(blocklist) if blocklist.blocked_count() > 0 => blocklist,
+            _ => return Ok(()),
+        };
+
+        if blocklist.log_skipped {
+            info!(
+                "Found {} applications in blocklist",
+                blocklist.blocked_count()
+            );
+        }
+
+        let mut skipped_apps = Vec::new();
+        let mut remaining_tasks = Vec::new();
+
+        // 过滤任务
+        for (config_path, task) in tasks.drain(..) {
+            if blocklist.is_blocked(&task.name, Some(&task.version)) {
+                skipped_apps.push(task.name.clone());
+
+                if blocklist.log_skipped {
+                    if blocklist.strict {
+                        warn!(
+                            "Skipping blocked application '{}' (config: {})",
+                            task.name,
+                            config_path.display()
+                        );
+                    } else {
+                        warn!(
+                            "Application '{}' is in blocklist but not skipped (strict mode off)",
+                            task.name
+                        );
+                    }
+                }
+
+                // 只有在严格模式下才真正跳过
+                if blocklist.strict {
+                    continue;
+                }
+            }
+            remaining_tasks.push((config_path, task));
+        }
+
+        *tasks = remaining_tasks;
+
+        // 输出摘要信息
+        if !skipped_apps.is_empty() && blocklist.log_skipped {
+            if blocklist.strict {
+                info!(
+                    "Skipped {} blocked applications: {}",
+                    skipped_apps.len(),
+                    skipped_apps.join(", ")
+                );
+            } else {
+                info!(
+                    "Found {} applications in blocklist but not skipped (strict mode off): {}",
+                    skipped_apps.len(),
+                    skipped_apps.join(", ")
+                );
+            }
+
+            // 输出所有blocked的应用
+            for (idx, app) in skipped_apps.iter().enumerate() {
+                log::debug!("Blocked application {}: {}", idx + 1, app);
+            }
+        }
+
+        Ok(())
     }
 }

@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "dadk"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -478,13 +478,14 @@ dependencies = [
 
 [[package]]
 name = "dadk-config"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cfg-if",
  "env_logger",
  "indexmap",
  "log",
+ "regex",
  "serde",
  "serde_json",
  "shlex",
@@ -495,7 +496,7 @@ dependencies = [
 
 [[package]]
 name = "dadk-user"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",

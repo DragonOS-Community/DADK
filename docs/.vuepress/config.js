@@ -51,6 +51,7 @@ export default defineUserConfig({
                             '/user-manual/quickstart.md',
                             '/user-manual/profiling.md',
                             '/user-manual/user-prog-build.md',
+                            '/user-manual/app-blocklist.md',
                             '/user-manual/envs.md',
                         ]
                     }

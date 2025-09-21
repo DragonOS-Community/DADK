@@ -1,4 +1,5 @@
 #![deny(clippy::all)]
+pub mod app_blocklist;
 pub mod boot;
 pub mod common;
 pub mod manifest;
