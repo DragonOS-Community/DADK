@@ -11,7 +11,7 @@ description = "DragonOS Application Development Kit - Config"
 license = "GPL-2.0-only"
 
 [dependencies]
-anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
+anyhow = { version = "1.0.100", features = ["std", "backtrace"] }
 cfg-if = "1.0.0"
 env_logger = { workspace = true }
 indexmap = "2.6.0"
