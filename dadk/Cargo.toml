@@ -30,7 +30,7 @@ required-features = ["insiders"]
 insiders = []
 
 [dependencies]
-anyhow = { version = "1.0.90", features = ["std", "backtrace"] }
+anyhow = { version = "1.0.100", features = ["std", "backtrace"] }
 clap = { version = "4.5.20", features = ["derive"] }
 crossbeam = "0.8.4"
 dadk-config = { version = "0.5.0", path = "../dadk-config" }
