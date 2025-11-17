@@ -18,6 +18,7 @@ use crate::{
     executor::Executor,
     parser::task::DADKTask,
 };
+use dadk_config::user::UserCleanLevel;
 
 use self::task_deque::TASK_DEQUE;
 
@@ -406,7 +407,10 @@ impl Scheduler {
         // 准备全局环境变量
         crate::executor::prepare_env(&self.target, &self.context)
             .map_err(|e| SchedulerError::RunError(format!("{:?}", e)))?;
-
+        log::info!(
+            "Global environment variables prepared, action: {:?}",
+            self.action
+        );
         match self.action {
             Action::Build | Action::Install => {
                 self.run_with_topo_sort()?;
@@ -461,6 +465,11 @@ impl Scheduler {
     }
 
     pub fn execute(action: Action, dragonos_dir: PathBuf, entity: Arc<SchedEntity>) {
+        log::info!(
+            "Starting task {} with action {:?}",
+            entity.task().name_version(),
+            action
+        );
         let mut executor = Executor::new(entity.clone(), action.clone(), dragonos_dir.clone())
             .map_err(|e| {
                 error!(
@@ -558,8 +567,64 @@ impl Scheduler {
     /// 无
     pub fn clean_daemon(action: Action, dragonos_dir: PathBuf, r: &mut Vec<Arc<SchedEntity>>) {
         let mut guard = TASK_DEQUE.lock().unwrap();
-        while !guard.queue().is_empty() && !r.is_empty() {
-            guard.clean_task(action, dragonos_dir.clone(), r.pop().unwrap().clone());
+        log::info!(
+            "Starting clean daemon for {} tasks, queue length: {}",
+            r.len(),
+            guard.queue().len()
+        );
+
+        // 清理操作不需要拓扑排序，直接处理所有任务
+        while !r.is_empty() {
+            let entity = r.pop().unwrap();
+
+            // 检查任务是否需要清理
+            match action {
+                // Clean(Output) 对所有任务都有效（清理构建输出目录）
+                Action::Clean(UserCleanLevel::Output) => {
+                    log::info!(
+                        "Adding task {} to clean queue",
+                        entity.task().name_version()
+                    );
+                    guard.clean_task(action, dragonos_dir.clone(), entity.clone());
+                }
+                // Clean(InSrc) 和 Clean(All) 需要有源码目录
+                Action::Clean(_level @ (UserCleanLevel::InSrc | UserCleanLevel::All)) => {
+                    // 判断任务是否有源码目录
+                    // 1. 本地路径的任务（source_path 不为 None）
+                    // 2. git 或 archive 类型的任务（会创建 source_dir）
+                    let has_source_dir = entity.task().source_path().is_some()
+                        || matches!(
+                            entity.task().task_type,
+                            crate::parser::task::TaskType::BuildFromSource(_)
+                                | crate::parser::task::TaskType::InstallFromPrebuilt(
+                                    crate::parser::task::PrebuiltSource::Archive(_)
+                                )
+                        );
+
+                    if has_source_dir {
+                        log::info!(
+                            "Adding task {} to clean queue",
+                            entity.task().name_version()
+                        );
+                        guard.clean_task(action, dragonos_dir.clone(), entity.clone());
+                    } else {
+                        log::info!(
+                            "Skipping task {} (no source directory to clean)",
+                            entity.task().name_version()
+                        );
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        // 等待所有清理任务完成
+        while !guard.queue().is_empty() {
+            guard.queue_mut().retain(|x| !x.is_finished());
+            if !guard.queue().is_empty() {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
         }
     }
 

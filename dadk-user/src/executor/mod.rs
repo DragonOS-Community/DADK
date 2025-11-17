@@ -425,6 +425,10 @@ impl Executor {
     fn clean_src(&self) -> Result<(), ExecutorError> {
         let cmd: Option<Command> = self.create_command()?;
         if cmd.is_none() {
+            log::warn!(
+                "{}: No clean command specified, skipping source directory clean.",
+                self.entity.task().name_version()
+            );
             // 如果这里没有命令，则认为用户不需要在源文件目录执行清理
             return Ok(());
         }
@@ -505,6 +509,11 @@ impl Executor {
         }
 
         let raw_cmd = raw_cmd.unwrap();
+
+        // 如果命令是空字符串，也返回 None
+        if raw_cmd.is_empty() {
+            return Ok(None);
+        }
 
         let mut command = Command::new("bash");
         command.current_dir(self.src_work_dir().unwrap());
