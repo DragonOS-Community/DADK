@@ -1,5 +1,5 @@
 [metadata]
-# Filesystem type (options: `fat32`)
+# Filesystem type (options: `fat32`, `ext4`)
 fs_type = "fat32"
 # Size of the rootfs disk image (eg, `1G`, `1024M`)
 size = "1G"
