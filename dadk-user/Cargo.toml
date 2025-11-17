@@ -1,6 +1,6 @@
 [package]
 name = "dadk-user"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "DragonOS Application Development Kit - user prog build"
 license = "GPL-2.0-only"
@@ -9,7 +9,7 @@ license = "GPL-2.0-only"
 anyhow = { version = "1.0.100", features = ["std", "backtrace"] }
 chrono = { version = "=0.4.35", features = ["serde"] }
 clap = { version = "=4.5.20", features = ["derive"] }
-dadk-config = { version = "0.5.0", path = "../dadk-config" }
+dadk-config = { version = "0.5.1", path = "../dadk-config" }
 derive_builder = "0.20.0"
 lazy_static = "1.4.0"
 log = "0.4.17"
