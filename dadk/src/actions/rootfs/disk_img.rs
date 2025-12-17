@@ -337,6 +337,7 @@ impl DiskFormatter {
     fn format_disk(disk_image_path: &PathBuf, fs_type: &FsType) -> Result<()> {
         match fs_type {
             FsType::Fat32 => Self::format_fat32(disk_image_path),
+            FsType::Ext4 => Self::format_ext4(disk_image_path),
         }
     }
 
@@ -351,6 +352,20 @@ impl DiskFormatter {
             Ok(())
         } else {
             Err(anyhow::anyhow!("Failed to format disk image as FAT32"))
+        }
+    }
+
+    fn format_ext4(disk_image_path: &PathBuf) -> Result<()> {
+        // Use the `mkfs.ext4` command to format the disk image as ext4
+        let status = Command::new("mkfs.ext4")
+            .arg("-F") // Force creation even if it looks like a whole disk
+            .arg(disk_image_path.to_str().unwrap())
+            .status()?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Failed to format disk image as ext4"))
         }
     }
 }
@@ -421,6 +436,36 @@ mod tests {
         assert!(
             output_str.contains("FAT (32 bit)"),
             "Disk image is not formatted as FAT32"
+        );
+    }
+
+    #[test]
+    fn test_format_ext4() {
+        // Create a temporary file to use as the disk image
+        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let disk_image_path = temp_file.path().to_path_buf();
+
+        // 16MB
+        let image_size = 16 * 1024 * 1024usize;
+        create_raw_img(&disk_image_path, image_size).expect("Failed to create raw disk image");
+
+        // Call the function to format the disk image as ext4
+        DiskFormatter::format_disk(&disk_image_path, &FsType::Ext4)
+            .expect("Failed to format disk image as ext4");
+
+        // Check if the disk image was actually formatted as ext4
+        // by running a command to inspect the filesystem type
+        let output = Command::new("file")
+            .arg("-sL")
+            .arg(&disk_image_path)
+            .output()
+            .expect("Failed to execute 'file' command");
+
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output_str.contains("ext4 filesystem data") || output_str.contains("Linux rev 1.0 ext4"),
+            "Disk image is not formatted as ext4, got: {}",
+            output_str
         );
     }
 
