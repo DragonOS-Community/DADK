@@ -16,6 +16,8 @@ pub struct RootFSConfigFile {
     pub metadata: RootFSMeta,
     #[serde(default)]
     pub partition: PartitionConfig,
+    #[serde(default)]
+    pub base: BaseConfig,
 }
 
 impl RootFSConfigFile {
@@ -43,6 +45,33 @@ pub struct RootFSMeta {
     pub size: usize,
 }
 
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct BaseConfig {
+    /// Docker image name, e.g. ubuntu:24.04
+    #[serde(default)]
+    pub image: String,
+    /// Pull policy: always | if-not-present | never
+    #[serde(default)]
+    pub pull_policy: PullPolicy,
+}
+
+impl BaseConfig {
+    pub fn has_base_image(&self) -> bool {
+        !self.image.trim().is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+pub enum PullPolicy {
+    #[serde(rename = "always")]
+    Always,
+    #[default]
+    #[serde(rename = "if-not-present")]
+    IfNotPresent,
+    #[serde(rename = "never")]
+    Never,
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -68,6 +97,7 @@ mod tests {
 
         assert_eq!(config.metadata.fs_type, FsType::Fat32);
         assert_eq!(config.metadata.size, 1024 * 1024 * 1024); // Assuming `deserialize_size` converts MB to Bytes
+        assert_eq!(config.base.has_base_image(), false);
     }
 
     #[test]
@@ -83,6 +113,7 @@ mod tests {
 
         assert_eq!(config.metadata.fs_type, FsType::Fat32);
         assert_eq!(config.metadata.size, 512 * 1024 * 1024); // Assuming `deserialize_size` converts MB to Bytes
+        assert_eq!(config.base.has_base_image(), false);
     }
     #[test]
     fn test_load_from_invalid_fs_type() {
@@ -108,6 +139,7 @@ mod tests {
 
         assert_eq!(config.metadata.fs_type, FsType::Fat32);
         assert_eq!(config.metadata.size, 1048576); // Assuming `deserialize_size` converts MB to Bytes
+        assert_eq!(config.base.has_base_image(), false);
     }
     #[test]
     fn test_load_from_valid_str_size_bytes_str() {
@@ -122,6 +154,26 @@ mod tests {
 
         assert_eq!(config.metadata.fs_type, FsType::Fat32);
         assert_eq!(config.metadata.size, 1048576); // Assuming `deserialize_size` converts MB to Bytes
+        assert_eq!(config.base.has_base_image(), false);
+    }
+
+    #[test]
+    fn test_load_with_base() {
+        let config_content = r#"
+            [metadata]
+            fs_type = "ext4"
+            size = "2G"
+
+            [base]
+            image = "ubuntu:24.04"
+            pull_policy = "if-not-present"
+        "#;
+        let config = RootFSConfigFile::load_from_str(config_content)
+            .expect("Failed to load config from str");
+        assert_eq!(config.metadata.fs_type, FsType::Ext4);
+        assert_eq!(config.base.has_base_image(), true);
+        assert_eq!(config.base.image, "ubuntu:24.04");
+        assert_eq!(config.base.pull_policy, PullPolicy::IfNotPresent);
     }
 
     #[test]

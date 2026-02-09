@@ -13,11 +13,11 @@ DADK是一个用于管理DragonOS的应用编译打包的工具。您可以通�
 
 
 ```
-MIN_DADK_VERSION = 0.2.0
+MIN_DADK_VERSION = 0.6.0
 ```
 
-::: warning 注意兼容性变化
-请注意，由于dadk重构的原因，0.2.0版本之前的dadk版本将不再兼容。这意味着您升级到0.2.0版本后，将无法再使用它去编译旧版本的DragonOS（可以降级）。
+::: warning 注意版本兼容性
+请确保您使用的 dadk 版本与 DragonOS 当前分支要求一致（当前推荐 `v0.6.0`）。
 :::
 
 您可以通过以下命令安装dadk:
@@ -25,10 +25,20 @@ MIN_DADK_VERSION = 0.2.0
 cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag <版本号> --locked
 ```
 
-比如，对于0.2.0版本，您可以使用以下命令安装: `(注意版本号前面有个v)`
+比如，对于0.6.0版本，您可以使用以下命令安装: `(注意版本号前面有个v)`
 ```shell
-cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.2.0 --locked
+cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.6.0 --locked
 ```
+
+## RootFS（ext4 + Docker base）
+
+从 `v0.6.0` 开始，DADK 支持：
+
+- `rootfs` 使用 `ext4`
+- 从 Docker 镜像导入 base rootfs
+- base 变更自动重建镜像
+
+详细设计与用法请参考：[RootFS 基础镜像](./rootfs-base.md)
 
 ## 打包你的第一个应用
 

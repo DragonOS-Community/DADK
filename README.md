@@ -14,6 +14,7 @@ DADK的文档托管在[DADK Docs](https://docs.dragonos.org.cn/p/dadk/)上。
 ## DADK有什么用？
 
 - 管理DragonOS应用的编译与安装
+- 管理DragonOS rootfs镜像（支持 ext4、Docker base 导入、base 变更自动重建）
 - 对DragonOS内核进行profiling
 - 管理DragonOS的镜像构建、虚拟机运行
 
@@ -27,6 +28,9 @@ DADK是一个Rust程序，您可以通过Cargo来安装DADK。
 ```shell
 # 从GitHub安装最新版
 cargo install --git https://github.com/DragonOS-Community/DADK.git
+
+# 或安装指定版本（推荐与DragonOS分支匹配）
+cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.6.0 --locked
 
 
 ```

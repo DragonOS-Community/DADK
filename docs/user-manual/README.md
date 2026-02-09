@@ -6,6 +6,7 @@
 ## 目录
 
 - [Quick Start - 快速开始！](./quickstart.md)
+- [RootFS 基础镜像](./rootfs-base.md)
 - [对DragonOS内核进行性能分析](./profiling.md)
 - [构建用户程序](./user-prog-build.md)
 - [环境变量](./envs.md)
