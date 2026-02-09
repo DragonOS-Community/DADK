@@ -1,20 +1,50 @@
-use std::{fs::File, io::Write, mem::ManuallyDrop, path::PathBuf, process::Command};
+use std::{
+    fs::File,
+    io::Write,
+    mem::ManuallyDrop,
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
 use crate::context::DADKExecContext;
 use anyhow::{anyhow, Result};
-use dadk_config::rootfs::{fstype::FsType, partition::PartitionType};
+use dadk_config::rootfs::{fstype::FsType, partition::PartitionType, PullPolicy};
+use serde::{Deserialize, Serialize};
 
 use super::loopdev::LoopDeviceBuilder;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct RootfsBaseMetadata {
+    image: String,
+    image_id: String,
+}
+
+impl RootfsBaseMetadata {
+    fn empty() -> Self {
+        Self {
+            image: String::new(),
+            image_id: String::new(),
+        }
+    }
+}
+
 pub(super) fn create(ctx: &DADKExecContext, skip_if_exists: bool) -> Result<()> {
     let disk_image_path = ctx.disk_image_path();
+    let desired_base_meta = resolve_desired_base_meta(ctx)?;
+
     if disk_image_path.exists() {
-        if skip_if_exists {
+        if let Some(change_reason) = detect_base_change(ctx, &disk_image_path, &desired_base_meta)?
+        {
+            log::warn!("Rootfs base changed, recreate disk image: {change_reason}");
+            delete(ctx, true)?;
+        } else if skip_if_exists {
             return Ok(());
+        } else {
+            return Err(anyhow!(
+                "Disk image already exists: {}",
+                disk_image_path.display()
+            ));
         }
-        return Err(anyhow!(
-            "Disk image already exists: {}",
-            disk_image_path.display()
-        ));
     }
 
     disk_path_safety_check(&disk_image_path)?;
@@ -25,14 +55,23 @@ pub(super) fn create(ctx: &DADKExecContext, skip_if_exists: bool) -> Result<()> 
 
     // 判断是否需要分区？
 
-    let r = if ctx.rootfs().partition.image_should_be_partitioned() {
+    let mut r = if ctx.rootfs().partition.image_should_be_partitioned() {
         create_partitioned_image(ctx, &disk_image_path)
     } else {
         create_unpartitioned_image(ctx, &disk_image_path)
     };
 
+    if r.is_ok() {
+        r = import_base_if_needed(ctx);
+    }
+
+    if r.is_ok() {
+        r = write_base_meta(&disk_image_path, &desired_base_meta);
+    }
+
     if r.is_err() {
         std::fs::remove_file(&disk_image_path).expect("Failed to remove disk image");
+        let _ = std::fs::remove_file(base_meta_path(&disk_image_path));
     }
     r
 }
@@ -52,7 +91,209 @@ pub(super) fn delete(ctx: &DADKExecContext, skip_if_not_exists: bool) -> Result<
 
     std::fs::remove_file(&disk_image_path)
         .map_err(|e| anyhow!("Failed to remove disk image: {}", e))?;
+    let base_meta = base_meta_path(&disk_image_path);
+    if base_meta.exists() {
+        std::fs::remove_file(base_meta)
+            .map_err(|e| anyhow!("Failed to remove base metadata: {}", e))?;
+    }
     Ok(())
+}
+
+fn detect_base_change(
+    ctx: &DADKExecContext,
+    disk_image_path: &PathBuf,
+    desired: &RootfsBaseMetadata,
+) -> Result<Option<String>> {
+    let meta_path = base_meta_path(disk_image_path);
+    if !meta_path.exists() {
+        if ctx.rootfs().base.has_base_image() {
+            return Ok(Some("base metadata not found".to_string()));
+        }
+        return Ok(None);
+    }
+
+    let existing = match read_base_meta(&meta_path) {
+        Ok(meta) => meta,
+        Err(e) => {
+            return Ok(Some(format!("base metadata invalid: {e}")));
+        }
+    };
+    if existing != *desired {
+        return Ok(Some(format!(
+            "existing(image={}, id={}) -> desired(image={}, id={})",
+            existing.image, existing.image_id, desired.image, desired.image_id
+        )));
+    }
+    Ok(None)
+}
+
+fn resolve_desired_base_meta(ctx: &DADKExecContext) -> Result<RootfsBaseMetadata> {
+    let base = &ctx.rootfs().base;
+    if !base.has_base_image() {
+        return Ok(RootfsBaseMetadata::empty());
+    }
+    ensure_docker_image_available(&base.image, base.pull_policy)?;
+    let image_id = docker_image_id(&base.image)?;
+    Ok(RootfsBaseMetadata {
+        image: base.image.clone(),
+        image_id,
+    })
+}
+
+fn ensure_docker_image_available(image: &str, pull_policy: PullPolicy) -> Result<()> {
+    let exists = docker_image_exists(image)?;
+    match pull_policy {
+        PullPolicy::Always => docker_pull(image),
+        PullPolicy::IfNotPresent => {
+            if exists {
+                Ok(())
+            } else {
+                docker_pull(image)
+            }
+        }
+        PullPolicy::Never => {
+            if exists {
+                Ok(())
+            } else {
+                Err(anyhow!(
+                    "Docker image not found in local cache and pull_policy=never: {image}"
+                ))
+            }
+        }
+    }
+}
+
+fn docker_image_exists(image: &str) -> Result<bool> {
+    let output = Command::new("docker")
+        .args(["image", "inspect", image])
+        .output()
+        .map_err(|e| anyhow!("Failed to run docker image inspect: {}", e))?;
+    Ok(output.status.success())
+}
+
+fn docker_pull(image: &str) -> Result<()> {
+    let status = Command::new("docker")
+        .args(["pull", image])
+        .status()
+        .map_err(|e| anyhow!("Failed to run docker pull: {}", e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("docker pull failed for image: {image}"))
+    }
+}
+
+fn docker_image_id(image: &str) -> Result<String> {
+    let output = Command::new("docker")
+        .args(["image", "inspect", "--format", "{{.Id}}", image])
+        .output()
+        .map_err(|e| anyhow!("Failed to run docker image inspect --format: {}", e))?;
+    if !output.status.success() {
+        return Err(anyhow!("docker image inspect failed for image: {image}"));
+    }
+    let image_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if image_id.is_empty() {
+        return Err(anyhow!("docker image id is empty for image: {image}"));
+    }
+    Ok(image_id)
+}
+
+fn import_base_if_needed(ctx: &DADKExecContext) -> Result<()> {
+    let base = &ctx.rootfs().base;
+    if !base.has_base_image() {
+        return Ok(());
+    }
+
+    log::info!("Import docker base image into rootfs: {}", base.image);
+    mount(ctx)?;
+    let mount_path = ctx.disk_mount_path();
+    let import_result = docker_export_to_dir(&base.image, &mount_path);
+    let umount_result = umount(ctx);
+    if let Err(e) = umount_result {
+        log::error!("Failed to umount rootfs after base import: {}", e);
+    }
+    import_result
+}
+
+fn docker_export_to_dir(image: &str, target_dir: &PathBuf) -> Result<()> {
+    let output = Command::new("docker")
+        .args(["create", image])
+        .output()
+        .map_err(|e| anyhow!("Failed to create container from image {image}: {e}"))?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "docker create failed for image {}: {}",
+            image,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if container_id.is_empty() {
+        return Err(anyhow!("docker create returned empty container id"));
+    }
+
+    let result = (|| -> Result<()> {
+        let mut export_child = Command::new("docker")
+            .args(["export", &container_id])
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| anyhow!("Failed to run docker export: {}", e))?;
+
+        let export_stdout = export_child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow!("Failed to capture docker export stdout"))?;
+
+        let tar_status = Command::new("tar")
+            .args(["-xpf", "-"])
+            .arg("-C")
+            .arg(target_dir)
+            .stdin(Stdio::from(export_stdout))
+            .status()
+            .map_err(|e| anyhow!("Failed to run tar extract: {}", e))?;
+
+        let export_status = export_child
+            .wait()
+            .map_err(|e| anyhow!("Failed waiting docker export: {}", e))?;
+
+        if !export_status.success() {
+            return Err(anyhow!(
+                "docker export failed for container {}",
+                container_id
+            ));
+        }
+        if !tar_status.success() {
+            return Err(anyhow!("tar extract failed for docker export output"));
+        }
+        Ok(())
+    })();
+
+    let rm_output = Command::new("docker")
+        .args(["rm", "-f", &container_id])
+        .output()
+        .map_err(|e| anyhow!("Failed to cleanup container {}: {}", container_id, e));
+    if let Err(e) = rm_output {
+        log::warn!("{e}");
+    }
+
+    result
+}
+
+fn base_meta_path(disk_image_path: &PathBuf) -> PathBuf {
+    disk_image_path.with_extension("base-meta.json")
+}
+
+fn write_base_meta(disk_image_path: &PathBuf, base_meta: &RootfsBaseMetadata) -> Result<()> {
+    let content = serde_json::to_string(base_meta)
+        .map_err(|e| anyhow!("serialize base meta failed: {}", e))?;
+    std::fs::write(base_meta_path(disk_image_path), content)
+        .map_err(|e| anyhow!("write base metadata failed: {}", e))
+}
+
+fn read_base_meta(path: &PathBuf) -> Result<RootfsBaseMetadata> {
+    let content =
+        std::fs::read_to_string(path).map_err(|e| anyhow!("read base metadata failed: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| anyhow!("parse base metadata failed: {}", e))
 }
 
 pub fn mount(ctx: &DADKExecContext) -> Result<()> {
@@ -337,6 +578,7 @@ impl DiskFormatter {
     fn format_disk(disk_image_path: &PathBuf, fs_type: &FsType) -> Result<()> {
         match fs_type {
             FsType::Fat32 => Self::format_fat32(disk_image_path),
+            FsType::Ext4 => Self::format_ext4(disk_image_path),
         }
     }
 
@@ -351,6 +593,18 @@ impl DiskFormatter {
             Ok(())
         } else {
             Err(anyhow::anyhow!("Failed to format disk image as FAT32"))
+        }
+    }
+
+    fn format_ext4(disk_image_path: &PathBuf) -> Result<()> {
+        let status = Command::new("mkfs.ext4")
+            .args(["-F", disk_image_path.to_str().unwrap()])
+            .status()?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Failed to format disk image as ext4"))
         }
     }
 }

@@ -49,6 +49,7 @@ export default defineUserConfig({
                         text: '用户指南',
                         children: [
                             '/user-manual/quickstart.md',
+                            '/user-manual/rootfs-base.md',
                             '/user-manual/profiling.md',
                             '/user-manual/user-prog-build.md',
                             '/user-manual/app-blocklist.md',
