@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Once},
 };
 
-use log::info;
+use log::{info, warn};
 
 use crate::{
     parser::{
@@ -255,9 +255,25 @@ impl TaskDataDir {
     pub fn task_log(&self) -> TaskLog {
         let path = self.dir.path.join(Self::TASK_LOG_FILE_NAME);
         if path.exists() {
-            let content = std::fs::read_to_string(&path).unwrap();
-            let task_log: TaskLog = toml::from_str(&content).unwrap();
-            return task_log;
+            match std::fs::read_to_string(&path) {
+                Ok(content) => match toml::from_str(&content) {
+                    Ok(task_log) => return task_log,
+                    Err(e) => {
+                        warn!(
+                            "Failed to parse task log at {:?}: {}. Use default task log instead.",
+                            path, e
+                        );
+                        return TaskLog::new();
+                    }
+                },
+                Err(e) => {
+                    warn!(
+                        "Failed to read task log at {:?}: {}. Use default task log instead.",
+                        path, e
+                    );
+                    return TaskLog::new();
+                }
+            }
         } else {
             return TaskLog::new();
         }
