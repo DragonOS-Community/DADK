@@ -30,7 +30,7 @@ DADK是一个Rust程序，您可以通过Cargo来安装DADK。
 cargo install --git https://github.com/DragonOS-Community/DADK.git
 
 # 或安装指定版本（推荐与DragonOS分支匹配）
-cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.6.0 --locked
+cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.6.1 --locked
 
 
 ```

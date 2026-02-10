@@ -13,11 +13,11 @@ DADK是一个用于管理DragonOS的应用编译打包的工具。您可以通�
 
 
 ```
-MIN_DADK_VERSION = 0.6.0
+MIN_DADK_VERSION = 0.6.1
 ```
 
 ::: warning 注意版本兼容性
-请确保您使用的 dadk 版本与 DragonOS 当前分支要求一致（当前推荐 `v0.6.0`）。
+请确保您使用的 dadk 版本与 DragonOS 当前分支要求一致（当前推荐 `v0.6.1`）。
 :::
 
 您可以通过以下命令安装dadk:
@@ -25,9 +25,9 @@ MIN_DADK_VERSION = 0.6.0
 cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag <版本号> --locked
 ```
 
-比如，对于0.6.0版本，您可以使用以下命令安装: `(注意版本号前面有个v)`
+比如，对于0.6.1版本，您可以使用以下命令安装: `(注意版本号前面有个v)`
 ```shell
-cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.6.0 --locked
+cargo install --git https://git.mirrors.dragonos.org.cn/DragonOS-Community/DADK.git --tag v0.6.1 --locked
 ```
 
 ## RootFS（ext4 + Docker base）
