@@ -11,6 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct TaskLog {
     /// 任务执行完成时间
     #[serde(
+        default,
         deserialize_with = "ok_or_default",
         skip_serializing_if = "Option::is_none"
     )]
@@ -148,5 +149,17 @@ impl<'de> Deserialize<'de> for InstallStatus {
                 Ok(InstallStatus::Failed)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaskLog;
+
+    #[test]
+    fn should_deserialize_legacy_task_log_without_build_timestamp() {
+        let content = "dadk_config_timestamp = \"2026-02-09T19:42:17.464516620Z\"\n";
+        let task_log: TaskLog = toml::from_str(content).expect("legacy task_log must be readable");
+        assert!(task_log.build_time().is_none());
     }
 }
